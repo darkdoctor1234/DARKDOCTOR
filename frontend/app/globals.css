@@ -1,0 +1,203 @@
+@import "tailwindcss";
+
+/* ── Type system ──
+   IBM Plex Serif/Sans/Mono, loaded via next/font/google in app/layout.tsx and
+   exposed as --font-plex-*. Falls back gracefully if the injected vars are
+   ever unavailable (e.g. a page rendered outside the root layout). */
+:root {
+  --font-serif: var(--font-plex-serif), Georgia, "Times New Roman", serif;
+  --font-sans:  var(--font-plex-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  --font-mono:  var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+/* ── Light theme — "Clinical Light" (default) ── */
+:root,
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --glass-bg: rgba(0, 0, 0, 0.04);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-tertiary: #64748b;
+  --accent: #0d9488;
+  --accent-hover: #0f766e;
+  --accent-glow: rgba(13, 148, 136, 0.20);
+  --error: #b91c1c;
+  --success: #15803d;
+  /* DD theme tokens — pure white page, slate-50 cards (matches the Clinical Light spec) */
+  --dd-bg:        #ffffff;
+  --dd-bg2:       #ffffff;
+  --dd-surface:   #f8fafc;
+  --dd-surface2:  #f1f5f9;
+  --dd-border:    #e2e8f0;
+  --dd-border2:   #cbd5e1;
+  --dd-text1:     #0f172a;
+  --dd-text2:     #334155;
+  --dd-text3:     #64748b;
+  --dd-text4:     #94a3b8;
+  --dd-nav-bg:    rgba(255, 255, 255, 0.94);
+  --dd-bottom-bg: rgba(255, 255, 255, 0.96);
+  --dd-input-bg:  #f8fafc;
+  --dd-teal:      #0d9488;
+  --dd-teal-hover:  #0f766e;
+  --dd-teal-bg:   rgba(13, 148, 136, 0.08);
+  --dd-teal-bg2:  rgba(13, 148, 136, 0.14);
+  --dd-teal-border: rgba(13, 148, 136, 0.28);
+  /* Semantic tones — separate from the teal accent */
+  --dd-success:        #15803d;
+  --dd-success-bg:      rgba(21, 128, 61, 0.08);
+  --dd-success-border:  rgba(21, 128, 61, 0.24);
+  --dd-warning:         #b45309;
+  --dd-warning-bg:      rgba(180, 83, 9, 0.08);
+  --dd-warning-border:  rgba(180, 83, 9, 0.22);
+  --dd-danger:          #b91c1c;
+  --dd-danger-bg:       rgba(185, 28, 28, 0.07);
+  --dd-danger-border:   rgba(185, 28, 28, 0.2);
+  --dd-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --dd-shadow-md: 0 6px 20px rgba(15, 23, 42, 0.07);
+  --dd-shadow-lg: 0 20px 48px rgba(15, 23, 42, 0.16);
+  color-scheme: light;
+}
+
+/* ── Dark theme — kept for the theme toggle; same teal accent, unlit surfaces ── */
+[data-theme="dark"] {
+  --bg-primary: #000000;
+  --bg-secondary: #0a0a0a;
+  --glass-bg: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
+  --accent: #2dd4bf;
+  --accent-hover: #5eead4;
+  --accent-glow: rgba(45, 212, 191, 0.25);
+  --error: #f87171;
+  --success: #4ade80;
+  /* DD theme tokens */
+  --dd-bg:        #0a0f1a;
+  --dd-bg2:       #111827;
+  --dd-surface:   rgba(255, 255, 255, 0.04);
+  --dd-surface2:  rgba(255, 255, 255, 0.07);
+  --dd-border:    rgba(255, 255, 255, 0.08);
+  --dd-border2:   rgba(255, 255, 255, 0.14);
+  --dd-text1:     #f1f5f9;
+  --dd-text2:     #94a3b8;
+  --dd-text3:     #64748b;
+  --dd-text4:     #475569;
+  --dd-nav-bg:    rgba(10, 15, 26, 0.92);
+  --dd-bottom-bg: rgba(10, 15, 26, 0.96);
+  --dd-input-bg:  rgba(255, 255, 255, 0.06);
+  --dd-teal:      #2dd4bf;
+  --dd-teal-hover:  #5eead4;
+  --dd-teal-bg:   rgba(45, 212, 191, 0.10);
+  --dd-teal-bg2:  rgba(45, 212, 191, 0.16);
+  --dd-teal-border: rgba(45, 212, 191, 0.25);
+  --dd-success:        #4ade80;
+  --dd-success-bg:      rgba(74, 222, 128, 0.1);
+  --dd-success-border:  rgba(74, 222, 128, 0.25);
+  --dd-warning:         #fbbf24;
+  --dd-warning-bg:      rgba(251, 191, 36, 0.1);
+  --dd-warning-border:  rgba(251, 191, 36, 0.24);
+  --dd-danger:          #f87171;
+  --dd-danger-bg:       rgba(248, 113, 113, 0.1);
+  --dd-danger-border:   rgba(248, 113, 113, 0.22);
+  --dd-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --dd-shadow-md: 0 6px 20px rgba(0, 0, 0, 0.3);
+  --dd-shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background-color: var(--dd-bg);
+  color: var(--dd-text1);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-serif);
+  text-wrap: balance;
+}
+
+/* Use wherever digits line up in columns — scores, counts, percentages, meters */
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background-color: var(--accent);
+  color: white;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--dd-border2);
+  border-radius: 3px;
+}
+
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+/* Balanced text wrapping on the onboarding heading — prevents orphan words */
+.feed-heading {
+  text-wrap: balance;
+}
+
+/* Feed page — responsive bottom clearance.
+   Shell already adds 64px + safe-area on mobile for the tab bar,
+   so the main only needs a small inner margin there. */
+.feed-main {
+  padding-top: 36px;
+  padding-bottom: 80px;
+}
+@media (max-width: 767px) {
+  .feed-main {
+    padding-top: 24px;
+    padding-bottom: 24px;
+  }
+}
+.feed-heading-section {
+  margin-bottom: 32px;
+}
+@media (max-width: 767px) {
+  .feed-heading-section {
+    margin-bottom: 24px;
+  }
+}
+
+/* Profile guest wall — vertically centers the card in the true visible area,
+   accounting for the sticky nav and the mobile bottom tab bar */
+.profile-guest-main {
+  min-height: calc(100vh - 60px);
+}
+@media (max-width: 767px) {
+  .profile-guest-main {
+    min-height: calc(100vh - 60px - 64px - env(safe-area-inset-bottom, 4px));
+  }
+}

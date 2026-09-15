@@ -1,0 +1,42 @@
+# Runs on the EC2 instance. Postgres is NOT a service here — it's RDS,
+# reached over the network via DB_HOST/DB_PASSWORD/etc in .env. Same for
+# media storage: with AWS_STORAGE_BUCKET_NAME set, uploads go straight to
+# S3, so there's no media volume to manage on the instance either.
+#
+# Copy backend/.env.example to backend/.env on the EC2 host and fill in the
+# real values (RDS endpoint, a generated SECRET_KEY, the S3 bucket, etc.)
+# before running `docker compose up -d`. That .env file must never be
+# committed — it holds real credentials.
+
+services:
+  app:
+    build: .
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - redis
+    volumes:
+      - static_volume:/app/staticfiles
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # No port published to the host on purpose — only `app` needs to reach
+    # it, over the compose network by service name (see REDIS_URL above).
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - static_volume:/app/staticfiles:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  static_volume:
