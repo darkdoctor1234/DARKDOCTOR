@@ -290,6 +290,29 @@ class HealthCheckTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "healthy")
 
+    def test_health_check_failure_never_leaks_the_raw_db_error(self):
+        """This endpoint is public and unauthenticated by design (an ALB
+        health check carries no credentials) — a raw DB exception can
+        contain the hostname/port/other connection details, which must
+        never reach an anonymous caller. The detail still needs to exist
+        *somewhere* for debugging, just server-side (see the view's own
+        logger.exception call, not asserted here since that's a logging
+        concern, not a response-shape one)."""
+        from unittest.mock import patch
+        from django.db.utils import OperationalError
+
+        secret_looking_detail = "could not connect to server: host ep-frosty-cherry-azq7yzj9.aws.neon.tech"
+        with patch("config.views.connection") as mock_connection:
+            mock_connection.cursor.side_effect = OperationalError(secret_looking_detail)
+            client = APIClient()
+            response = client.get("/health/")
+
+        self.assertEqual(response.status_code, 503)
+        body = response.content.decode()
+        self.assertEqual(response.json()["status"], "unhealthy")
+        self.assertNotIn("neon.tech", body)
+        self.assertNotIn(secret_looking_detail, body)
+
 
 class ProductionSettingsHardFailTests(TestCase):
     """config/settings/production.py must refuse to boot at all if
