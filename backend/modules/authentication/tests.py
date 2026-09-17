@@ -282,6 +282,31 @@ class AuthThrottleTests(TestCase):
         response = self.client.get("/api/v1/colleges/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_throttle_cannot_be_bypassed_by_spoofing_x_forwarded_for(self):
+        """The actual bug NUM_PROXIES (config/settings/base.py) exists to
+        close: neither AWS's ALB nor nginx *replace* an existing
+        X-Forwarded-For header, they only ever append to it — so without
+        NUM_PROXIES telling DRF exactly which entry its own trusted proxy
+        appended, a client sending a different fake prefix on every request
+        would get a brand new throttle identity each time, bypassing the
+        limit entirely. Simulates the real 2-hop chain (ALB appends the
+        real IP, nginx appends its own) with an attacker-controlled,
+        request-varying first segment."""
+        payload = {"email": "throttletest@example.com", "password": "wrongpassword"}
+        real_client_ip = "203.0.113.7"  # what the ALB actually appended
+        nginx_own_ip = "172.18.0.5"     # what nginx's own hop appended after that
+        statuses = []
+        for i in range(11):
+            spoofed_prefix = f"9.9.9.{i}"  # attacker varies this every single request
+            xff = f"{spoofed_prefix}, {real_client_ip}, {nginx_own_ip}"
+            response = self.client.post(
+                "/api/v1/auth/user/login/", payload, format="json",
+                HTTP_X_FORWARDED_FOR=xff,
+            )
+            statuses.append(response.status_code)
+        self.assertEqual(statuses[:10].count(status.HTTP_429_TOO_MANY_REQUESTS), 0)
+        self.assertEqual(statuses[10], status.HTTP_429_TOO_MANY_REQUESTS)
+
 
 class HealthCheckTests(TestCase):
     def test_health_check_reports_healthy_and_needs_no_auth(self):
