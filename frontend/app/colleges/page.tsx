@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { getUser, isAuthenticated } from "@/lib/auth";
 import { collegeApi, College } from "@/lib/collegeApi";
 import { profileApi } from "@/lib/profileApi";
@@ -149,8 +149,15 @@ function StateDropdown({
 
 export default function CollegesPage() {
   const router       = useRouter();
-  const searchParams  = useSearchParams();
-  const showAll       = searchParams.get("all") === "1";
+  // Read via window.location rather than next/navigation's useSearchParams()
+  // — that hook requires the reading component to sit inside a <Suspense>
+  // boundary (Next.js opts a route out of static rendering otherwise, which
+  // breaks `next build`), and wrapping just to read one boolean flag isn't
+  // worth it here. Starts `false` (matching the server-rendered pass, which
+  // has no location to read) and is set client-side in the effect below —
+  // same "flip true only after mount" technique already used for
+  // `checkingDefault` right below, for the same SSR/hydration reason.
+  const [showAll, setShowAll] = useState(false);
 
   const [user, setUser]               = useState<SessionUser | null>(null);
   const [mounted, setMounted]         = useState(false);
@@ -180,11 +187,18 @@ export default function CollegesPage() {
 
   useEffect(() => {
     setMounted(true);
+    setShowAll(new URLSearchParams(window.location.search).get("all") === "1");
     if (isAuthenticated()) setUser(getUser<SessionUser>());
   }, []);
 
   useEffect(() => {
-    if (showAll || !isAuthenticated()) return;
+    // Re-reads location directly rather than trusting the `showAll` state
+    // above: both effects fire in the same pass on initial mount, before
+    // that state update has taken effect, so relying on it here would let
+    // this run once against a stale (pre-mount) value of `showAll` and
+    // briefly kick off the own-college redirect even when the URL already
+    // said ?all=1.
+    if (new URLSearchParams(window.location.search).get("all") === "1" || !isAuthenticated()) return;
     setCheckingDefault(true);
     let cancelled = false;
     profileApi.get()

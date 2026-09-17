@@ -2,11 +2,17 @@ Django==5.0.6
 djangorestframework==3.15.2
 djangorestframework-simplejwt==5.3.1
 django-cors-headers==4.4.0
-psycopg2-binary==2.9.9
+psycopg2-binary==2.9.12
 python-dotenv==1.0.1
 django-environ==0.11.2
 gunicorn==22.0.0
 openpyxl==3.1.5
+# Required by Django's ImageField (colleges.ReviewImage.image) — was never
+# actually pinned here despite being a hard runtime dependency; only worked
+# locally because it happened to already be installed in venv_new. A fresh
+# install (Docker build, CI, a new dev's venv) would fail Django's own
+# system checks without it.
+Pillow==12.2.0
 
 # Production deployment — Redis cache (fixes OTP codes breaking across
 # multiple gunicorn workers) and S3-backed media storage (EC2's own disk is

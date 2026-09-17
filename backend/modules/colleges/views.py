@@ -40,10 +40,19 @@ from modules.authentication.permissions import IsSuperAdmin, IsAdmin
 # avg_rating / review_count are aggregated from visible reviews' overall-rating
 # field (a stand-in for the review's 5-category average, cheap to aggregate in
 # SQL) — used for the star rating shown on directory list cards.
-_COLLEGE_LIST_QUERYSET = College.objects.prefetch_related("departments").annotate(
-    avg_rating=Avg("reviews__rating_overall", filter=Q(reviews__status=Review.Status.VISIBLE)),
-    review_count=Count("reviews", filter=Q(reviews__status=Review.Status.VISIBLE)),
-).all()
+#
+# Built fresh on every call, not hoisted to a module-level constant: the list
+# view below returns this queryset unfiltered and unpaginated straight to the
+# serializer, so a shared instance would have its results cached (Django's
+# QuerySet._result_cache) the first time anyone hit GET /colleges/, and every
+# request after that — for the lifetime of the worker process — would keep
+# returning that one frozen snapshot, silently hiding every college added
+# afterward until the process restarted.
+def _college_list_queryset():
+    return College.objects.prefetch_related("departments").annotate(
+        avg_rating=Avg("reviews__rating_overall", filter=Q(reviews__status=Review.Status.VISIBLE)),
+        review_count=Count("reviews", filter=Q(reviews__status=Review.Status.VISIBLE)),
+    ).all()
 
 _COLLEGE_QUERYSET = College.objects.prefetch_related(
     "departments", "seat_entries", "fee_entries", "stipend_entries"
@@ -53,7 +62,7 @@ _COLLEGE_QUERYSET = College.objects.prefetch_related(
 class CollegeListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         if self.request.method == "GET":
-            return _COLLEGE_LIST_QUERYSET
+            return _college_list_queryset()
         return _COLLEGE_QUERYSET
 
     def get_permissions(self):
