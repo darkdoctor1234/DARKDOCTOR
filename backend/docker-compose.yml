@@ -1,0 +1,44 @@
+# Runs on the EC2 instance (and works identically for local testing, since
+# Neon and Supabase are both reached over the public internet either way —
+# no VPC/network setup needed for either). Postgres is NOT a service here —
+# it's Neon, reached over the network via DB_HOST/DB_PASSWORD/etc in .env.
+# Same for media storage: with AWS_STORAGE_BUCKET_NAME set, uploads go
+# straight to Supabase, so there's no media volume to manage here either.
+#
+# Copy backend/.env.example to backend/.env (or reuse the one from local
+# dev — same Neon/Supabase values work here unchanged) and fill in a real
+# SECRET_KEY before running `docker compose up -d --build`. That .env file
+# must never be committed — it holds real credentials.
+
+services:
+  app:
+    build: .
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - redis
+    volumes:
+      - static_volume:/app/staticfiles
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # No port published to the host on purpose — only `app` needs to reach
+    # it, over the compose network by service name (see REDIS_URL above).
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - static_volume:/app/staticfiles:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  static_volume:
