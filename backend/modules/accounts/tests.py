@@ -286,3 +286,46 @@ class CollegeChangeRequestFlowTests(TestCase):
         proof = SimpleUploadedFile("proof.pdf", b"x" * (6 * 1024 * 1024), content_type="application/pdf")
         response = self._submit(self.client, proof=proof)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class AdminPasswordStrengthTests(TestCase):
+    """A super admin creating/editing another admin account goes through
+    the exact same AUTH_PASSWORD_VALIDATORS policy as self-registration —
+    see modules.authentication.password_validation."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.superadmin = User.objects.create_user(
+            email="super1@example.com", password="x", username="super1", role=User.Role.SUPER_ADMIN,
+        )
+        self.client.force_authenticate(user=self.superadmin)
+
+    def test_creating_admin_with_weak_password_is_rejected(self):
+        response = self.client.post("/api/v1/accounts/admins/", {
+            "email": "newadmin@example.com", "full_name": "New Admin", "password": "password123",
+        }, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("password", response.data)
+        self.assertFalse(User.objects.filter(email="newadmin@example.com").exists())
+
+    def test_creating_admin_with_strong_password_succeeds(self):
+        response = self.client.post("/api/v1/accounts/admins/", {
+            "email": "newadmin2@example.com", "full_name": "New Admin", "password": "Xk7$mQp2vLwN9z",
+        }, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_editing_admin_leaving_password_blank_does_not_trigger_validation(self):
+        """Blank password on the update endpoint means "don't change it" —
+        must not get rejected as if it were a weak password."""
+        target = User.objects.create_user(email="existing@example.com", password="x", username="existingadmin", role=User.Role.ADMIN)
+        response = self.client.patch(f"/api/v1/accounts/admins/{target.id}/", {
+            "full_name": "Renamed Admin", "email": "existing@example.com", "password": "",
+        }, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_editing_admin_with_weak_new_password_is_rejected(self):
+        target = User.objects.create_user(email="existing2@example.com", password="x", username="existingadmin2", role=User.Role.ADMIN)
+        response = self.client.patch(f"/api/v1/accounts/admins/{target.id}/", {
+            "full_name": "Existing Admin", "email": "existing2@example.com", "password": "12345678",
+        }, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

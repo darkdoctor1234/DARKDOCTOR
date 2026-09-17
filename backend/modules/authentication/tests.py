@@ -8,6 +8,10 @@ from modules.accounts.models import User
 
 class RegistrationTests(TestCase):
     def setUp(self):
+        # Registration shares the "auth" throttle scope (see AuthThrottleTests)
+        # — without clearing between tests, this class's own cumulative
+        # request count across methods can trip the 10/min limit itself.
+        cache.clear()
         self.client = APIClient()
         self.url = "/api/v1/auth/register/"
         self.valid_payload = {
@@ -50,6 +54,27 @@ class RegistrationTests(TestCase):
         response = self.client.post(self.url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("password", response.data)
+
+    def test_register_enforces_the_configured_password_validators(self):
+        """AUTH_PASSWORD_VALIDATORS (config/settings/base.py) is real,
+        enforced policy, not decoration — these three are exactly the
+        cases it's configured to catch, and none of them are merely
+        "too short" (all well past the 8-char minimum on their own)."""
+        cases = {
+            "entirely numeric": "13579108642",
+            "a well-known common password": "password123",
+            "too similar to the account's own email": "asha@example",
+        }
+        for label, password in cases.items():
+            payload = {**self.valid_payload, "email": f"{label[:6]}@example.com".replace(" ", ""), "password": password}
+            response = self.client.post(self.url, payload, format="json")
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, f"{label} ({password!r}) should be rejected")
+            self.assertIn("password", response.data, f"{label} should fail on the password field specifically")
+
+    def test_register_accepts_a_genuinely_strong_password(self):
+        payload = {**self.valid_payload, "password": "Xk7$mQp2vLwN9z"}
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_register_requires_batch_for_student_status(self):
         payload = {
@@ -216,6 +241,25 @@ class PasswordResetTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         login = self.client.post("/api/v1/auth/user/login/", {"email": "reset@example.com", "password": "oldpassword"}, format="json")
         self.assertEqual(login.status_code, status.HTTP_200_OK)
+
+    def test_reset_password_rejects_a_weak_new_password_and_leaves_old_one_active(self):
+        """Same AUTH_PASSWORD_VALIDATORS policy as registration — a valid
+        OTP alone must not be enough to set a common/weak password. The OTP
+        itself must not be silently consumed by a rejected attempt either,
+        so a legitimate retry with a strong password still works."""
+        otp = self.client.post("/api/v1/auth/forgot-password/", {"email": "reset@example.com"}, format="json").data["dev_otp"]
+        weak = self.client.post("/api/v1/auth/reset-password/", {
+            "email": "reset@example.com", "otp": otp, "new_password": "password123",
+        }, format="json")
+        self.assertEqual(weak.status_code, status.HTTP_400_BAD_REQUEST)
+
+        still_old = self.client.post("/api/v1/auth/user/login/", {"email": "reset@example.com", "password": "oldpassword"}, format="json")
+        self.assertEqual(still_old.status_code, status.HTTP_200_OK)
+
+        retry = self.client.post("/api/v1/auth/reset-password/", {
+            "email": "reset@example.com", "otp": otp, "new_password": "Xk7$mQp2vLwN9z",
+        }, format="json")
+        self.assertEqual(retry.status_code, status.HTTP_200_OK)
 
     def test_reset_password_otp_is_single_use(self):
         otp = self.client.post("/api/v1/auth/forgot-password/", {"email": "reset@example.com"}, format="json").data["dev_otp"]
