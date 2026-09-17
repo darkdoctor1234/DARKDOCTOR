@@ -186,6 +186,20 @@ REST_FRAMEWORK = {
         # attempt would actually target.
         "auth": "10/min",
     },
+    # Without this, every IP-based throttle above is trivially bypassable:
+    # a client can send its own fake X-Forwarded-For header, and since
+    # neither AWS's ALB nor nginx's $proxy_add_x_forwarded_for *replaces*
+    # an existing X-Forwarded-For (both only ever *append* to it), that
+    # fake value survives all the way to Django. With NUM_PROXIES unset,
+    # DRF's throttle keys on the *entire* XFF string verbatim — varying
+    # the fake prefix on every request gets a fresh throttle bucket each
+    # time, defeating the whole point of modules.authentication.throttles.
+    # Set to 2, matching the real deployment's two trusted hops (ALB, then
+    # nginx) — DRF then correctly reads the 2nd-from-last entry, which is
+    # what the ALB itself appended (the one hop actually vouching for the
+    # real client IP), ignoring anything the client tried to prepend.
+    # Override via env var if the proxy topology ever changes.
+    "NUM_PROXIES": env.int("NUM_PROXIES", default=2),
 }
 
 SIMPLE_JWT = {
