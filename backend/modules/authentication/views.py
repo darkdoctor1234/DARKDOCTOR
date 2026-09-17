@@ -10,6 +10,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from modules.accounts.models import User
 from .serializers import LoginSerializer, RegisterSerializer
 from .emails import send_verification_email, send_password_reset_email
+from .throttles import AuthRateThrottle
 
 
 def get_tokens_for_user(user):
@@ -57,6 +58,7 @@ def build_user_payload(user):
 
 class AdminLoginView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     def post(self, request):
         serializer = LoginSerializer(data={**request.data, "role_required": User.Role.ADMIN})
@@ -74,6 +76,7 @@ class AdminLoginView(APIView):
 
 class SuperAdminLoginView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     def post(self, request):
         serializer = LoginSerializer(data={**request.data, "role_required": User.Role.SUPER_ADMIN})
@@ -112,6 +115,7 @@ class LogoutView(APIView):
 class UserLoginView(APIView):
     """Login for end users (role=user)."""
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     def post(self, request):
         serializer = LoginSerializer(data={**request.data, "role_required": User.Role.USER})
@@ -129,6 +133,7 @@ class UserLoginView(APIView):
 class RegisterView(APIView):
     """Public registration — creates a new end user and returns tokens (auto-login)."""
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
@@ -163,6 +168,7 @@ class ForgotPasswordView(APIView):
     Always returns 200 to prevent email enumeration.
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     def post(self, request):
         email = request.data.get("email", "").strip().lower()
@@ -194,6 +200,7 @@ class ResetPasswordView(APIView):
     Body: { "email": "...", "otp": "123456", "new_password": "..." }
     """
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
 
     def post(self, request):
         email        = request.data.get("email", "").strip().lower()

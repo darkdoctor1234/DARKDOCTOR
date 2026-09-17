@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, UserProfile, CollegeChangeRequest
+from .models import User, UserProfile, CollegeChangeRequest, PROOF_ALLOWED_CONTENT_TYPES
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -133,6 +133,20 @@ class CollegeChangeRequestCreateSerializer(serializers.ModelSerializer):
     def validate_proof(self, value):
         if value.size > 5 * 1024 * 1024:
             raise serializers.ValidationError("File must be 5MB or smaller.")
+        # Belt-and-suspenders with the model's FileExtensionValidator: that
+        # one checks the filename's extension (spoofable by just renaming a
+        # file), this checks the browser/client-reported content type too.
+        # Neither alone is bulletproof against a determined attacker (real
+        # protection against a malicious payload disguised as a PDF would
+        # need content sniffing, e.g. python-magic — not worth the extra
+        # dependency for a proof-document upload reviewed by a human admin
+        # before it's ever trusted for anything), but together they block
+        # the actual failure mode seen so far: uploading an arbitrary file
+        # with no regard for type at all.
+        if value.content_type not in PROOF_ALLOWED_CONTENT_TYPES:
+            raise serializers.ValidationError(
+                "Only PDF, JPG, or PNG files are accepted as proof documents."
+            )
         return value
 
 

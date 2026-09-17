@@ -119,6 +119,48 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Django's own built-in default logging config only prints request errors
+# (django.request, e.g. an unhandled 500) to console when DEBUG=True, and
+# tries to email ADMINS (unconfigured here) when DEBUG=False — meaning a
+# production 500 currently produces zero log output anywhere, silently.
+# This overrides that: always print to stdout, which is exactly what
+# `docker compose logs` / `journalctl` / any container log driver already
+# captures — no extra log-shipping setup needed to at least see the error.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "[{asctime}] {levelname} {name}: {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        # Unhandled view exceptions (500s) — always logged with a full
+        # traceback, regardless of DEBUG.
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
+
 from datetime import timedelta
 
 REST_FRAMEWORK = {
@@ -138,6 +180,11 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/hour",
         "user": "1000/hour",
+        # Login/register/password-reset — see modules.authentication.throttles.
+        # Deliberately much tighter than the generic anon rate: those
+        # endpoints are exactly where a brute-force/credential-stuffing
+        # attempt would actually target.
+        "auth": "10/min",
     },
 }
 
@@ -224,3 +271,23 @@ if EMAIL_HOST:
 else:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="Darkdoctor <no-reply@darkdoctor.app>")
+
+# Error tracking. Optional — leave SENTRY_DSN blank (e.g. local dev, or
+# before a Sentry project exists yet) and this is a complete no-op; nothing
+# imports the sentry_sdk package at all unless it's set, same fallback
+# pattern as REDIS_URL/AWS_STORAGE_BUCKET_NAME/EMAIL_HOST above. Without
+# this, a production error is only ever visible via container/journal logs
+# (see LOGGING above) — someone has to go looking for it; Sentry surfaces
+# it proactively instead.
+SENTRY_DSN = env("SENTRY_DSN", default="")
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration()],
+        traces_sample_rate=0.1,
+        send_default_pii=False,  # never forward request bodies/user PII to Sentry
+        environment=env("SENTRY_ENVIRONMENT", default="production"),
+    )
