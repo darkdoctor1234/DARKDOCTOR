@@ -2,6 +2,7 @@ from django.db import transaction
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from modules.accounts.models import User, UserProfile
+from .password_validation import validate_password_strength
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -9,7 +10,12 @@ class RegisterSerializer(serializers.Serializer):
     full_name = serializers.CharField(min_length=2, max_length=255)
     username  = serializers.CharField(min_length=3, max_length=30)
     email     = serializers.EmailField()
-    password  = serializers.CharField(min_length=6, write_only=True)
+    # No min_length here — validate() below runs Django's real
+    # AUTH_PASSWORD_VALIDATORS (min length 8, not-too-common,
+    # not-all-numeric, not-too-similar-to-email/username), which is the
+    # actual configured policy; a separate, smaller min_length here would
+    # just be a second, weaker, inconsistent check.
+    password  = serializers.CharField(write_only=True)
 
     # ── Profile fields (all optional — collected on signup step 2 & 3) ───────
     current_status    = serializers.ChoiceField(
@@ -71,6 +77,19 @@ class RegisterSerializer(serializers.Serializer):
         )
         if requires_batch and not attrs.get("batch", "").strip():
             raise serializers.ValidationError({"batch": "Batch year is required for students and alumni."})
+
+        # Object-level (not field-level validate_password) so
+        # UserAttributeSimilarityValidator can actually compare the
+        # password against the email/username being registered — an
+        # unsaved, in-memory instance is enough, Django never touches the
+        # DB for this.
+        try:
+            validate_password_strength(attrs.get("password", ""), user=User(
+                email=attrs.get("email", ""), username=attrs.get("username", ""),
+            ))
+        except serializers.ValidationError as exc:
+            raise serializers.ValidationError({"password": exc.detail})
+
         return attrs
 
     # ── Atomic create: User + UserProfile in one transaction ─────────────────

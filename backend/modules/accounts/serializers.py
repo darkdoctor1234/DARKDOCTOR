@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import User, UserProfile, CollegeChangeRequest, PROOF_ALLOWED_CONTENT_TYPES
+from modules.authentication.password_validation import validate_password_strength
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -10,7 +11,10 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class CreateAdminSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, min_length=6)
+    # No min_length here — validate() below runs the real
+    # AUTH_PASSWORD_VALIDATORS policy (see RegisterSerializer for why a
+    # separate, smaller min_length would just be a second weaker check).
+    password = serializers.CharField(write_only=True)
     id = serializers.IntegerField(read_only=True)
     # Writable, but only an existing super admin can ever reach this serializer
     # in the first place (AdminListCreateView is IsSuperAdmin-gated), so
@@ -31,14 +35,21 @@ class CreateAdminSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("An account with this email already exists.")
         return value.lower()
 
+    def validate(self, attrs):
+        try:
+            validate_password_strength(attrs.get("password", ""), user=User(
+                email=attrs.get("email", ""), full_name=attrs.get("full_name", ""),
+            ))
+        except serializers.ValidationError as exc:
+            raise serializers.ValidationError({"password": exc.detail})
+        return attrs
+
     def create(self, validated_data):
         return User.objects.create_user(**validated_data)
 
 
 class UpdateAdminSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(
-        write_only=True, min_length=6, required=False, allow_blank=True
-    )
+    password = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = User
@@ -49,6 +60,15 @@ class UpdateAdminSerializer(serializers.ModelSerializer):
         if User.objects.filter(email=value).exclude(pk=self.instance.pk).exists():
             raise serializers.ValidationError("An account with this email already exists.")
         return value.lower()
+
+    def validate(self, attrs):
+        password = attrs.get("password")
+        if password:  # blank/omitted means "don't change the password" — nothing to validate
+            try:
+                validate_password_strength(password, user=self.instance)
+            except serializers.ValidationError as exc:
+                raise serializers.ValidationError({"password": exc.detail})
+        return attrs
 
     def update(self, instance, validated_data):
         password = validated_data.pop("password", None)

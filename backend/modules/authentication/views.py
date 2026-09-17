@@ -5,12 +5,14 @@ from django.core.cache import cache
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from modules.accounts.models import User
 from .serializers import LoginSerializer, RegisterSerializer
 from .emails import send_verification_email, send_password_reset_email
 from .throttles import AuthRateThrottle
+from .password_validation import validate_password_strength
 
 
 def get_tokens_for_user(user):
@@ -210,9 +212,6 @@ class ResetPasswordView(APIView):
         if not all([email, otp, new_password]):
             return Response({"detail": "Email, OTP, and new password are required."}, status=400)
 
-        if len(new_password) < 6:
-            return Response({"detail": "Password must be at least 6 characters."}, status=400)
-
         cache_key   = f"pwd_reset_{hashlib.sha256(email.encode()).hexdigest()}"
         stored_otp  = cache.get(cache_key)
 
@@ -223,6 +222,11 @@ class ResetPasswordView(APIView):
             user = User.objects.get(email=email, role=User.Role.USER, is_active=True)
         except User.DoesNotExist:
             return Response({"detail": "Invalid or expired reset code."}, status=400)
+
+        try:
+            validate_password_strength(new_password, user=user)
+        except DRFValidationError as exc:
+            return Response({"detail": exc.detail[0] if isinstance(exc.detail, list) else exc.detail}, status=400)
 
         user.set_password(new_password)
         user.save(update_fields=["password"])
