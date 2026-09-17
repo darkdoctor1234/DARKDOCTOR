@@ -252,3 +252,99 @@ class ProtectedEndpointAuthTests(TestCase):
         client.credentials(HTTP_AUTHORIZATION="Bearer not-a-real-token")
         response = client.get("/api/v1/colleges/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class AuthThrottleTests(TestCase):
+    """The dedicated, much stricter throttle on credential-guessing
+    surfaces (modules.authentication.throttles.AuthRateThrottle, 10/min) —
+    distinct from and far tighter than the generic 100/hour anon rate that
+    covers every other public endpoint."""
+
+    def setUp(self):
+        cache.clear()
+        self.client = APIClient()
+        User.objects.create_user(email="throttletest@example.com", password="correcthorse", username="throttleuser")
+
+    def test_login_endpoint_blocks_after_the_auth_rate_limit(self):
+        payload = {"email": "throttletest@example.com", "password": "wrongpassword"}
+        statuses = [self.client.post("/api/v1/auth/user/login/", payload, format="json").status_code for _ in range(11)]
+        # First 10 are evaluated normally (401, wrong password) — none throttled yet.
+        self.assertEqual(statuses[:10].count(status.HTTP_429_TOO_MANY_REQUESTS), 0)
+        # The 11th is blocked by the throttle itself, before credentials are even checked.
+        self.assertEqual(statuses[10], status.HTTP_429_TOO_MANY_REQUESTS)
+
+    def test_generic_anon_endpoints_are_unaffected_by_the_auth_throttle(self):
+        """Exhausting the auth-scoped budget must not touch the separate,
+        much looser generic anon throttle that every other public endpoint
+        (e.g. the college directory) relies on."""
+        for _ in range(11):
+            self.client.post("/api/v1/auth/user/login/", {"email": "x@x.com", "password": "x"}, format="json")
+        response = self.client.get("/api/v1/colleges/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class HealthCheckTests(TestCase):
+    def test_health_check_reports_healthy_and_needs_no_auth(self):
+        client = APIClient()
+        response = client.get("/health/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "healthy")
+
+
+class ProductionSettingsHardFailTests(TestCase):
+    """config/settings/production.py must refuse to boot at all if
+    SECRET_KEY, SUPERADMIN_EMAIL, SUPERADMIN_PASSWORD, or ALLOWED_HOSTS are
+    still at their known-insecure default — see that file's own comment
+    for why (it's the only thing that actually guards the real gunicorn
+    boot path; Django's system-checks framework does not run for a plain
+    WSGI load). This is import-time behavior, so it has to run in a real
+    subprocess to isolate cleanly — an in-process test can't "unimport" a
+    settings module once Django has loaded it."""
+
+    # Every setting the check cares about, all given real/safe values —
+    # each test below overrides exactly ONE of these back to its insecure
+    # default, so a failure can only ever be caused by the one thing that
+    # test claims to be checking (otherwise, e.g., the ALLOWED_HOSTS test
+    # could "pass" for the wrong reason — SUPERADMIN_EMAIL happening to
+    # also be unset — which is exactly what a first draft of this test
+    # actually did).
+    _SAFE_ENV = {
+        "SECRET_KEY": "a-real-randomly-generated-secret-key-abc123xyz",
+        "SUPERADMIN_EMAIL": "real-admin@realdomain.com",
+        "SUPERADMIN_PASSWORD": "a-real-strong-password",
+        "ALLOWED_HOSTS": "example.com",
+    }
+
+    def _run(self, **overrides):
+        import subprocess, sys, os
+        env = os.environ.copy()
+        env.update({
+            "DJANGO_SETTINGS_MODULE": "config.settings.production",
+            "DB_NAME": "x", "DB_USER": "x", "DB_PASSWORD": "x",
+        })
+        env.update(self._SAFE_ENV)
+        env.update(overrides)
+        backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        return subprocess.run(
+            [sys.executable, "-c", "import django; django.setup()"],
+            env=env, capture_output=True, text=True, cwd=backend_dir, timeout=30,
+        )
+
+    def test_refuses_to_boot_with_default_secret_key(self):
+        result = self._run(SECRET_KEY="django-insecure-change-this-in-production-!!!")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("SECRET_KEY", result.stderr)
+
+    def test_refuses_to_boot_with_default_superadmin_credentials(self):
+        result = self._run(SUPERADMIN_EMAIL="dark@gmail.com", SUPERADMIN_PASSWORD="000346")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("SUPERADMIN_EMAIL", result.stderr)
+
+    def test_refuses_to_boot_with_wildcard_allowed_hosts(self):
+        result = self._run(ALLOWED_HOSTS="*")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ALLOWED_HOSTS", result.stderr)
+
+    def test_boots_cleanly_with_real_values(self):
+        result = self._run()  # no overrides — every setting stays at its safe value
+        self.assertEqual(result.returncode, 0, result.stderr)

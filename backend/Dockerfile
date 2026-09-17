@@ -12,9 +12,13 @@ COPY . .
 
 # Collect static files at build time, not on every container start — the
 # image is immutable, so this only needs to happen once. collectstatic
-# never touches the database, so this is safe to run with no other env
-# vars set (SECRET_KEY/DB settings all have defaults in base.py).
-RUN DJANGO_SETTINGS_MODULE=config.settings.production python manage.py collectstatic --noinput
+# never touches the database or anything security-sensitive, so it uses
+# config.settings.base directly rather than .production — the real .env
+# (with a real SECRET_KEY etc.) doesn't exist yet at image-build time, and
+# .production now deliberately refuses to import at all without one (see
+# its own comment) — correct for the real runtime boot below, but this
+# step needs none of that.
+RUN DJANGO_SETTINGS_MODULE=config.settings.base python manage.py collectstatic --noinput
 
 EXPOSE 8000
 

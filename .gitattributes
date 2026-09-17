@@ -1,0 +1,5 @@
+# Shell scripts run on Linux (EC2) — CRLF line endings break the shebang
+# line there ("bad interpreter" errors), a real, easy-to-hit failure mode
+# for anyone editing deploy/*.sh on Windows. Force LF always, regardless of
+# core.autocrlf on whichever machine commits the change.
+*.sh text eol=lf

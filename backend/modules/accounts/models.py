@@ -1,5 +1,6 @@
 from datetime import timedelta
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.utils import timezone
 
@@ -179,6 +180,19 @@ def college_change_proof_upload_path(instance, filename):
     return f"college_change_proofs/{instance.user_id}/{filename}"
 
 
+# What a real admission letter / bonafide certificate / ID card scan
+# actually comes as — a scanned document or a photo of one. Deliberately
+# not "anything" (that's how the 5 migration-test .txt files got in — see
+# HANDOVER.md's Supabase migration section; those pre-existing rows are
+# unaffected, this only gates new uploads going forward).
+PROOF_ALLOWED_EXTENSIONS = ["pdf", "jpg", "jpeg", "png"]
+PROOF_ALLOWED_CONTENT_TYPES = {
+    "application/pdf": "pdf",
+    "image/jpeg": ("jpg", "jpeg"),
+    "image/png": "png",
+}
+
+
 class CollegeChangeRequest(models.Model):
     """A user's request to change an already-locked ug_college/pg_college,
     with proof, reviewed by an admin — see UserProfile.is_college_locked."""
@@ -200,7 +214,10 @@ class CollegeChangeRequest(models.Model):
     requested_college = models.ForeignKey(
         "colleges.College", on_delete=models.CASCADE, related_name="+",
     )
-    proof  = models.FileField(upload_to=college_change_proof_upload_path)
+    proof  = models.FileField(
+        upload_to=college_change_proof_upload_path,
+        validators=[FileExtensionValidator(allowed_extensions=PROOF_ALLOWED_EXTENSIONS)],
+    )
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     rejection_reason = models.CharField(max_length=255, blank=True, default="")
     resolved_by = models.ForeignKey(

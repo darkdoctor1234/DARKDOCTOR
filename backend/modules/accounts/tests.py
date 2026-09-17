@@ -165,9 +165,10 @@ class CollegeChangeRequestFlowTests(TestCase):
             ug_college_set_at=timezone.now() - COLLEGE_EDIT_GRACE_PERIOD - timedelta(hours=1),
         )
 
-    def _submit(self, client, **overrides):
+    def _submit(self, client, proof=None, **overrides):
         from django.core.files.uploadedfile import SimpleUploadedFile
-        proof = SimpleUploadedFile("proof.txt", b"proof content", content_type="text/plain")
+        if proof is None:
+            proof = SimpleUploadedFile("proof.pdf", b"%PDF-1.4 fake but valid-looking", content_type="application/pdf")
         payload = {"field": "ug_college", "requested_college": self.other_college.id, "proof": proof, **overrides}
         return client.post("/api/v1/accounts/college-change-requests/", payload, format="multipart")
 
@@ -239,3 +240,49 @@ class CollegeChangeRequestFlowTests(TestCase):
         anon_client = APIClient()
         response = self._submit(anon_client)
         self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
+
+    def test_proof_upload_accepts_jpg_and_png_too(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.force_authenticate(user=self.user)
+        for i, (name, content_type) in enumerate([("proof.jpg", "image/jpeg"), ("proof.png", "image/png")]):
+            profile = UserProfile.objects.create(
+                user=User.objects.create_user(email=f"{name}@example.com", password="x", username=f"prooftype{i}"),
+                ug_college=self.college,
+                ug_college_set_at=timezone.now() - COLLEGE_EDIT_GRACE_PERIOD - timedelta(hours=1),
+            )
+            client = APIClient()
+            client.force_authenticate(user=profile.user)
+            proof = SimpleUploadedFile(name, b"fake image bytes", content_type=content_type)
+            response = self._submit(client, proof=proof)
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED, f"{name} should be accepted")
+
+    def test_proof_upload_rejects_disallowed_file_type(self):
+        """The real bug this closes: proof uploads used to accept literally
+        anything — this is exactly how .txt test files ended up in
+        production Supabase storage during the migration (see HANDOVER.md).
+        A rejected upload must also not create a change-request row at all."""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.force_authenticate(user=self.user)
+        proof = SimpleUploadedFile("proof.txt", b"not a real document", content_type="text/plain")
+        response = self._submit(self.client, proof=proof)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(CollegeChangeRequest.objects.count(), 0)
+
+    def test_proof_upload_rejects_mismatched_extension_and_content_type(self):
+        """A file renamed to look allowed (.pdf extension) but whose actual
+        declared content type isn't one of the allowed ones — the
+        content-type check is independent of the extension check, so
+        spoofing just the filename isn't enough on its own."""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.force_authenticate(user=self.user)
+        proof = SimpleUploadedFile("proof.pdf", b"actually an executable or script", content_type="application/x-msdownload")
+        response = self._submit(self.client, proof=proof)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(CollegeChangeRequest.objects.count(), 0)
+
+    def test_proof_upload_rejects_oversized_file_regardless_of_type(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.force_authenticate(user=self.user)
+        proof = SimpleUploadedFile("proof.pdf", b"x" * (6 * 1024 * 1024), content_type="application/pdf")
+        response = self._submit(self.client, proof=proof)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

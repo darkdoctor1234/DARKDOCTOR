@@ -41,6 +41,9 @@ Fill in `.env` with:
 - `AWS_STORAGE_BUCKET_NAME`/`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/`AWS_S3_REGION_NAME`/`AWS_S3_ENDPOINT_URL`/`AWS_S3_CUSTOM_DOMAIN` — already have these from the Supabase migration.
 - Leave `REDIS_URL` blank in `.env` itself — `docker-compose.yml` sets it for you (`redis://redis:6379/0`, the sibling Redis container, reached by service name over the compose network).
 - `CORS_ALLOWED_ORIGINS`/`CSRF_TRUSTED_ORIGINS` — the real Vercel URL (see step 6).
+- `SENTRY_DSN` — optional, but worth setting (see `.env.example`'s comment) so a production error surfaces proactively instead of only being visible via `docker compose logs`.
+
+**The first four above aren't just a suggestion — `config/settings/production.py` refuses to start at all if `SECRET_KEY`, `ALLOWED_HOSTS`, `SUPERADMIN_EMAIL`, or `SUPERADMIN_PASSWORD` are still at their insecure defaults.** If `docker compose up` immediately shows the `app` container exiting/restarting, `docker compose logs app` will name exactly which one was missed.
 
 Then:
 
@@ -59,6 +62,7 @@ At this point `curl http://<ec2-public-ip>/api/v1/colleges/` should return real 
 Don't run certbot/Let's Encrypt inside the nginx container — the standard, low-maintenance AWS pattern is:
 - Request a free certificate in ACM (AWS Certificate Manager) for your domain.
 - Create an Application Load Balancer in front of the EC2 instance, listening on 443 with that certificate attached, forwarding plain HTTP to the instance's port 80.
+- **Target group health check: path `/health/`, on port 80.** It does a real DB round-trip against Neon (see `config/views.py`), so it correctly reports unhealthy — and pulls the instance out of rotation — if the database itself is unreachable, not just if the process happens to be alive.
 - ACM auto-renews the certificate for free — nothing to maintain on the box.
 - Point your domain's DNS at the ALB (once you have a domain — not required to get a working `https://` URL first, the ALB gets its own AWS-provided DNS name immediately).
 
@@ -69,12 +73,11 @@ Once the backend has a real URL (ALB's DNS name, or your domain once attached), 
 ## Redeploying after a code change
 
 ```bash
-cd DARKDOCTOR
-git pull origin master
-cd backend
-docker compose up -d --build
-docker compose exec app python manage.py migrate   # only does anything if there are new migrations
+cd DARKDOCTOR/backend
+./deploy/deploy.sh
 ```
+
+Scripts exactly what used to be manual steps here — pulls `master`, rebuilds and restarts the containers, waits for the app to actually be ready (not just "container started"), runs migrations, then curls `/health/` and fails loudly if it isn't reporting healthy. If you'd rather run the steps by hand: `git pull origin master`, `docker compose up -d --build`, `docker compose exec app python manage.py migrate`.
 
 ## Testing this locally first (optional but recommended)
 
