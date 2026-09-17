@@ -1,0 +1,29 @@
+[Unit]
+Description=Darkdoctor Django backend (gunicorn)
+After=network.target
+
+[Service]
+# Adjust User/Group and the two path lines to match wherever the repo is
+# actually cloned on the box — this assumes the standard `ubuntu` user with
+# the repo cloned to that user's home directory.
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/DARKDOCTOR/backend
+Environment=DJANGO_SETTINGS_MODULE=config.settings.production
+
+# 3 workers / 2 threads: enough concurrency for a single small EC2 instance
+# without being wasteful — see HANDOVER.md's deployment section. Requires
+# REDIS_URL to be set in backend/.env (django-environ loads it directly,
+# no systemd env injection needed) — without it, OTP codes intermittently
+# fail to verify across the 3 worker processes.
+ExecStart=/home/ubuntu/DARKDOCTOR/backend/venv/bin/gunicorn \
+    config.wsgi:application \
+    --bind 127.0.0.1:8000 \
+    --workers 3 \
+    --threads 2
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
