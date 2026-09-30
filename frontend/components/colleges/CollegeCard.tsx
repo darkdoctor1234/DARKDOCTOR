@@ -14,9 +14,9 @@ export default function CollegeCard({ college, isSuperAdmin, onEdit, onDelete }:
   const router = useRouter();
 
   const isGovt      = college.college_type === "govt";
-  const accentColor = isGovt ? "#0d9488" : "#7c3aed";
-  const accentBg    = isGovt ? "rgba(13,148,136,0.10)" : "rgba(124,58,237,0.10)";
-  const accentBorder= isGovt ? "rgba(13,148,136,0.25)" : "rgba(124,58,237,0.25)";
+  const accentColor = isGovt ? "#0d9488" : "#ac2430";
+  const accentBg    = isGovt ? "rgba(13,148,136,0.10)" : "rgba(172,36,48,0.10)";
+  const accentBorder= isGovt ? "rgba(13,148,136,0.25)" : "rgba(172,36,48,0.25)";
 
   const courses = [
     ...(college.has_mbbs    ? ["MBBS"]   : []),
@@ -129,7 +129,7 @@ export default function CollegeCard({ college, isSuperAdmin, onEdit, onDelete }:
         href={college.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(college.name + (college.state ? `, ${college.state}` : ""))}`}
         target="_blank" rel="noopener noreferrer"
         onClick={(e) => e.stopPropagation()}
-        style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "4px", color: "var(--dd-text3)", fontSize: "0.8rem", textDecoration: "none" }}
+        style={{ display: "inline-flex", alignSelf: "flex-start", alignItems: "center", gap: "4px", marginBottom: "4px", color: "var(--dd-text3)", fontSize: "0.8rem", textDecoration: "none" }}
         onMouseEnter={(e) => { e.currentTarget.style.color = "#0d9488"; }}
         onMouseLeave={(e) => { e.currentTarget.style.color = "var(--dd-text3)"; }}
       >

@@ -166,10 +166,10 @@ export default function CreatePostModal({ communityId, communityName, onClose, o
           <button type="submit" disabled={submitting}
             style={{
               padding: "13px", borderRadius: "12px",
-              background: submitting ? "var(--dd-border2)" : "linear-gradient(135deg,#7c3aed 0%,#0d9488 100%)",
+              background: submitting ? "var(--dd-border2)" : "linear-gradient(135deg,#ac2430 0%,#0d9488 100%)",
               border: "none", color: submitting ? "var(--dd-text4)" : "#fff", fontSize: "0.9375rem", fontWeight: 600,
               cursor: submitting ? "not-allowed" : "pointer",
-              boxShadow: submitting ? "none" : "0 4px 20px rgba(124,58,237,0.3)",
+              boxShadow: submitting ? "none" : "0 4px 20px rgba(172,36,48,0.3)",
             }}
           >
             {submitting ? "Posting…" : "Post to Group"}

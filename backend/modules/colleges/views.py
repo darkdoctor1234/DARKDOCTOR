@@ -589,7 +589,29 @@ class ReviewAdminActionView(APIView):
             review.resolved_by = request.user
             review.save(update_fields=["status", "resolved_by"])
             return Response({"detail": "Review removed."})
-        return Response({"detail": "action must be 'approve', 'reject' or 'remove'."}, status=400)
+        elif action == "edit":
+            if not request.user.is_super_admin:
+                return Response({"detail": "Only a super admin can edit content."}, status=403)
+            editable_fields = [
+                "title", "content", "rating_infrastructure", "rating_clinical",
+                "rating_hostel", "rating_administration", "rating_overall",
+            ]
+            changed = []
+            for field in editable_fields:
+                if field in request.data:
+                    setattr(review, field, request.data[field])
+                    changed.append(field)
+            if not changed:
+                return Response({"detail": "No editable fields provided."}, status=400)
+            review.resolved_by = request.user
+            review.save(update_fields=changed + ["resolved_by"])
+            notify(
+                review.user, "content_edited",
+                f"Your review of {review.college.name} was edited by an admin.",
+                url=f"/colleges/{review.college_id}", actor=request.user,
+            )
+            return Response(ReviewAdminSerializer(review).data)
+        return Response({"detail": "action must be 'approve', 'reject', 'remove' or 'edit'."}, status=400)
 
 
 class MyReviewsView(generics.ListAPIView):
@@ -671,6 +693,20 @@ class QuestionListCreateView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
         question = serializer.save(college=college, user=request.user)
+
+        # Notify everyone ever affiliated with this college (UG or PG,
+        # regardless of current status) that a new question was asked —
+        # deliberately scoped to "question" kind only, not discussions.
+        if question.kind == Question.Kind.QUESTION:
+            affiliated = User.objects.filter(
+                Q(profile__ug_college_id=college.id) | Q(profile__pg_college_id=college.id)
+            )
+            notify_many(
+                affiliated, "question_new",
+                f'New question at {college.name}: "{question.title}"',
+                url=f"/colleges/{college.id}/questions/{question.id}",
+                actor=request.user,
+            )
         return Response(QuestionSerializer(question, context={"request": request}).data, status=201)
 
 
@@ -708,6 +744,37 @@ class QuestionAnswerListCreateView(APIView):
 
     def post(self, request, pk):
         question = get_object_or_404(Question, pk=pk)
+
+        # These three rules are deliberately scoped to "question" only, not
+        # "discussion" — a discussion is an open-ended conversation where
+        # replying more than once (or the OP joining in) is normal; a
+        # question is meant to get one definitive answer per person.
+        if question.kind == Question.Kind.QUESTION:
+            # 1. Restricted to people ever affiliated (UG or PG, any status —
+            # current students and alumni both have real first-hand
+            # knowledge) with the college it was asked under.
+            profile = getattr(request.user, "profile", None)
+            affiliated = profile is not None and question.college_id in (
+                profile.ug_college_id, profile.pg_college_id,
+            )
+            if not affiliated and not request.user.is_super_admin:
+                return Response(
+                    {"detail": "Only students or alumni of this college can answer this question."},
+                    status=403,
+                )
+            # 2. The asker can't answer their own question.
+            if question.user_id == request.user.id:
+                return Response(
+                    {"detail": "You can't answer your own question."},
+                    status=403,
+                )
+            # 3. One answer per person per question.
+            if question.answers.filter(user_id=request.user.id).exists():
+                return Response(
+                    {"detail": "You've already answered this question."},
+                    status=403,
+                )
+
         serializer = AnswerCreateSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
@@ -818,7 +885,7 @@ class QuestionAdminActionView(APIView):
 
     def patch(self, request, pk):
         question = get_object_or_404(Question, pk=pk)
-        action = request.data.get("action")  # "approve" or "remove"
+        action = request.data.get("action")  # "approve", "remove" or "edit"
 
         if action == "approve":
             question.status = ModerationStatus.VISIBLE
@@ -828,7 +895,23 @@ class QuestionAdminActionView(APIView):
             question.status = ModerationStatus.REMOVED
             question.save(update_fields=["status"])
             return Response({"detail": "Question removed."})
-        return Response({"detail": "action must be 'approve' or 'remove'."}, status=400)
+        elif action == "edit":
+            if not request.user.is_super_admin:
+                return Response({"detail": "Only a super admin can edit content."}, status=403)
+            title = request.data.get("title")
+            content = request.data.get("content")
+            if title is not None:
+                question.title = title
+            if content is not None:
+                question.content = content
+            question.save(update_fields=["title", "content"])
+            notify(
+                question.user, "content_edited",
+                f"Your question at {question.college.name} was edited by an admin.",
+                url=f"/colleges/{question.college_id}/questions/{question.id}", actor=request.user,
+            )
+            return Response(QuestionAdminSerializer(question).data)
+        return Response({"detail": "action must be 'approve', 'remove' or 'edit'."}, status=400)
 
 
 class AnswerAdminActionView(APIView):
@@ -837,7 +920,7 @@ class AnswerAdminActionView(APIView):
 
     def patch(self, request, pk):
         answer = get_object_or_404(Answer, pk=pk)
-        action = request.data.get("action")  # "approve" or "remove"
+        action = request.data.get("action")  # "approve", "remove" or "edit"
 
         if action == "approve":
             answer.status = ModerationStatus.VISIBLE
@@ -847,4 +930,17 @@ class AnswerAdminActionView(APIView):
             answer.status = ModerationStatus.REMOVED
             answer.save(update_fields=["status"])
             return Response({"detail": "Answer removed."})
-        return Response({"detail": "action must be 'approve' or 'remove'."}, status=400)
+        elif action == "edit":
+            if not request.user.is_super_admin:
+                return Response({"detail": "Only a super admin can edit content."}, status=403)
+            content = request.data.get("content")
+            if content is not None:
+                answer.content = content
+            answer.save(update_fields=["content"])
+            notify(
+                answer.user, "content_edited",
+                f'Your answer to "{answer.question.title}" was edited by an admin.',
+                url=f"/colleges/{answer.question.college_id}/questions/{answer.question_id}", actor=request.user,
+            )
+            return Response(AnswerAdminSerializer(answer).data)
+        return Response({"detail": "action must be 'approve', 'remove' or 'edit'."}, status=400)

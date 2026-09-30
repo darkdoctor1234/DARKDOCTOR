@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api";
 import { saveSession, isAuthenticated, FEED_PREFS_KEY } from "@/lib/auth";
 import { collegeApi, type College } from "@/lib/collegeApi";
-import { STATUS_OPTIONS, type StatusValue } from "@/lib/profileApi";
+import { STATUS_OPTIONS, type StatusValue, UG_YEAR_OPTIONS, PG_YEAR_OPTIONS, type YearOfStudyValue } from "@/lib/profileApi";
 import { DEPARTMENT_GROUPS } from "@/lib/departments";
+import { matchesQuery } from "@/lib/search";
 
 function collegeFields(status: StatusValue, edu: "ug" | "pg" | "") {
   switch (status) {
@@ -68,7 +69,7 @@ function StepIndicator({ step }: { step: number }) {
                 width: "28px", height: "28px", borderRadius: "50%",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: "0.75rem", fontWeight: 700,
-                background: done ? "var(--dd-success)" : active ? "linear-gradient(135deg,#0d9488,#7c3aed)" : "var(--dd-surface2)",
+                background: done ? "var(--dd-success)" : active ? "linear-gradient(135deg,#0d9488,#ac2430)" : "var(--dd-surface2)",
                 border: done || active ? "none" : "1px solid var(--dd-border2)",
                 color: done || active ? "#fff" : "var(--dd-text3)",
                 transition: "all 0.2s",
@@ -113,6 +114,7 @@ export default function SignupPage() {
   const [pgCollege,  setPgCollege]  = useState<number | null>(null);
   const [pgDepartment, setPgDepartment] = useState("");
   const [batch,      setBatch]      = useState("");
+  const [yearOfStudy, setYearOfStudy] = useState<YearOfStudyValue>("");
   const [colleges,   setColleges]   = useState<College[]>([]);
 
   const [phone,   setPhone]   = useState("");
@@ -122,7 +124,15 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
 
   const { showUg, showPg, needsEdu } = collegeFields(status, highestEdu);
+  // PG Aspirants haven't started PG yet, so they don't have a specialty to
+  // report — only actual PG students/graduates/faculty do.
+  const showPgDept = showPg && status !== "pg_aspirant";
   const needsBatch = status === "ug_student" || status === "pg_student" || status === "alumni";
+  // Year of study is distinct from Batch (admission year) — it's which year
+  // of the course they're in right now, so only meaningful for someone
+  // currently enrolled, not alumni (already graduated).
+  const showYearOfStudy = status === "ug_student" || status === "pg_student";
+  const yearOptions = status === "pg_student" ? PG_YEAR_OPTIONS : UG_YEAR_OPTIONS;
   const ugColleges = colleges.filter((c) => c.is_ug);
   const pgColleges = colleges.filter((c) => c.is_pg);
 
@@ -215,8 +225,9 @@ export default function SignupPage() {
         highest_education: (status && needsEdu ? highestEdu : "") || undefined,
         ug_college:        showUg ? ugCollege : null,
         pg_college:        showPg ? pgCollege : null,
-        pg_department:     showPg ? pgDepartment : undefined,
+        pg_department:     showPgDept ? pgDepartment : undefined,
         batch:             needsBatch ? batch.trim() : undefined,
+        year_of_study:     showYearOfStudy ? yearOfStudy : undefined,
         phone:             phone.trim()   || undefined,
         address:           address.trim() || undefined,
       });
@@ -277,8 +288,14 @@ export default function SignupPage() {
         <div style={{ textAlign: "center", marginBottom: "28px" }}>
           <button onClick={() => router.push("/")} style={{ background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Darkdoctor" draggable={false}
-              style={{ height: "38px", width: "auto", objectFit: "contain" }} />
+            <span style={{ display: "inline-flex" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" className="dd-logo-light" alt="Darkdoctor" draggable={false}
+              style={{ height: "72px", width: "auto", objectFit: "contain" }} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo-dark.png" className="dd-logo-dark" alt="Darkdoctor" draggable={false}
+              style={{ height: "72px", width: "auto", objectFit: "contain" }} />
+            </span>
           </button>
           <h1 style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--dd-text1)", letterSpacing: "-0.03em", marginTop: "16px", marginBottom: "4px" }}>
             Create your account
@@ -393,7 +410,7 @@ export default function SignupPage() {
               {error && <ErrorBox>{error}</ErrorBox>}
 
               <button type="button" onClick={goToStep2} disabled={loading}
-                style={{ padding: "12px", borderRadius: "12px", background: "linear-gradient(135deg,#0d9488 0%,#7c3aed 100%)", border: "none", color: "#fff", fontSize: "0.9375rem", fontWeight: 600, cursor: loading ? "wait" : "pointer", marginTop: "4px", boxShadow: "0 4px 20px rgba(13,148,136,0.24)", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", opacity: loading ? 0.75 : 1 }}>
+                style={{ padding: "12px", borderRadius: "12px", background: "linear-gradient(135deg,#0d9488 0%,#ac2430 100%)", border: "none", color: "#fff", fontSize: "0.9375rem", fontWeight: 600, cursor: loading ? "wait" : "pointer", marginTop: "4px", boxShadow: "0 4px 20px rgba(13,148,136,0.24)", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", opacity: loading ? 0.75 : 1 }}>
                 {loading ? "Checking…" : "Continue"}
                 {!loading && <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>}
               </button>
@@ -464,7 +481,7 @@ export default function SignupPage() {
                       <CollegeSelect colleges={pgColleges} value={pgCollege} onChange={setPgCollege} placeholder="Select PG college…" />
                     </div>
                   )}
-                  {showPg && (
+                  {showPgDept && (
                     <div>
                       <Label>PG Specialty <span style={{ fontWeight: 400, color: "var(--dd-text4)" }}>(optional, can add later)</span></Label>
                       <div style={{ position: "relative" }}>
@@ -489,10 +506,27 @@ export default function SignupPage() {
 
               {needsBatch && (
                 <div style={{ paddingTop: "14px", borderTop: "1px solid var(--dd-border)" }}>
-                  <Label>Batch Year</Label>
+                  <Label>Batch <span style={{ fontWeight: 400, color: "var(--dd-text4)" }}>(year you joined)</span></Label>
                   <input id="signup-batch" name="batch" type="text" value={batch} onChange={(e) => setBatch(e.target.value)}
                     placeholder="e.g. 2016"
                     style={inputBase} onFocus={focusBlue} onBlur={blurDefault} />
+                </div>
+              )}
+
+              {showYearOfStudy && (
+                <div style={{ paddingTop: "14px", borderTop: needsBatch ? "none" : "1px solid var(--dd-border)" }}>
+                  <Label>Year of Study <span style={{ fontWeight: 400, color: "var(--dd-text4)" }}>(optional)</span></Label>
+                  <div style={{ position: "relative" }}>
+                    <select
+                      id="signup-year-of-study" name="year_of_study"
+                      value={yearOfStudy} onChange={(e) => setYearOfStudy(e.target.value as YearOfStudyValue)}
+                      style={{ ...inputBase, appearance: "none", WebkitAppearance: "none", cursor: "pointer", color: yearOfStudy ? "var(--dd-text1)" : "var(--dd-text4)" }}
+                    >
+                      <option value="">Select year of study…</option>
+                      {yearOptions.map((y) => <option key={y.value} value={y.value}>{y.label}</option>)}
+                    </select>
+                    <svg style={{ position: "absolute", right: "14px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: "var(--dd-text3)" }} width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 6l4 4 4-4"/></svg>
+                  </div>
                 </div>
               )}
 
@@ -505,7 +539,7 @@ export default function SignupPage() {
                   Back
                 </button>
                 <button type="button" onClick={goToStep3}
-                  style={{ flex: 1, padding: "12px", borderRadius: "12px", background: "linear-gradient(135deg,#0d9488 0%,#7c3aed 100%)", border: "none", color: "#fff", fontSize: "0.9375rem", fontWeight: 600, cursor: "pointer", boxShadow: "0 4px 20px rgba(13,148,136,0.24)", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+                  style={{ flex: 1, padding: "12px", borderRadius: "12px", background: "linear-gradient(135deg,#0d9488 0%,#ac2430 100%)", border: "none", color: "#fff", fontSize: "0.9375rem", fontWeight: 600, cursor: "pointer", boxShadow: "0 4px 20px rgba(13,148,136,0.24)", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
                   Continue
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
                 </button>
@@ -579,12 +613,7 @@ function CollegeSelect({ colleges, value, onChange, placeholder }: {
   const listRef  = useRef<HTMLUListElement>(null);
 
   const selectedCollege = colleges.find((c) => c.id === value) ?? null;
-  const filtered = query.trim()
-    ? colleges.filter((c) =>
-        c.name.toLowerCase().includes(query.toLowerCase()) ||
-        (c.state ?? "").toLowerCase().includes(query.toLowerCase())
-      )
-    : colleges;
+  const filtered = colleges.filter((c) => matchesQuery(query, c.name, c.state));
 
   useEffect(() => {
     function onMouseDown(e: MouseEvent) {

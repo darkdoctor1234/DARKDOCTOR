@@ -65,7 +65,7 @@ function CommunityCard({ community, onJoin, busy }: {
             <span style={{
               position: "absolute", top: "-2px", right: "-2px",
               width: "11px", height: "11px", borderRadius: "50%",
-              background: "#7c3aed", border: "2px solid var(--dd-bg2)",
+              background: "#ac2430", border: "2px solid var(--dd-bg2)",
             }} />
           )}
         </div>
@@ -93,7 +93,7 @@ function CommunityCard({ community, onJoin, busy }: {
             onClick={() => router.push(`/communities/${community.id}`)}
             style={{
               padding: "8px 18px", borderRadius: "9px", flexShrink: 0,
-              background: "linear-gradient(135deg,#7c3aed 0%,#0d9488 100%)",
+              background: "linear-gradient(135deg,#ac2430 0%,#0d9488 100%)",
               border: "none", color: "#fff", fontSize: "0.8125rem", fontWeight: 600,
               cursor: "pointer",
             }}
@@ -174,7 +174,7 @@ export default function CommunitiesPage() {
           ) : !isAuthenticated() ? (
             <div style={{ textAlign: "center", padding: "56px 20px", borderRadius: "18px", background: "var(--dd-surface)", border: "1px solid var(--dd-border)" }}>
               <p style={{ fontSize: "0.9rem", color: "var(--dd-text2)", marginBottom: "16px" }}>Sign in to see your communities.</p>
-              <a href="/login" style={{ display: "inline-block", padding: "10px 22px", borderRadius: "10px", background: "linear-gradient(135deg,#7c3aed 0%,#0d9488 100%)", color: "#fff", fontSize: "0.875rem", fontWeight: 600, textDecoration: "none" }}>
+              <a href="/login" style={{ display: "inline-block", padding: "10px 22px", borderRadius: "10px", background: "linear-gradient(135deg,#ac2430 0%,#0d9488 100%)", color: "#fff", fontSize: "0.875rem", fontWeight: 600, textDecoration: "none" }}>
                 Sign In
               </a>
             </div>

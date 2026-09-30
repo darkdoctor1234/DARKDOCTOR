@@ -2,6 +2,7 @@
 
 interface QAItemBase {
   id: number;
+  user?: number;
   content: string;
   report_count: number;
   user_name: string;
@@ -24,9 +25,12 @@ type Props = {
   acting: boolean;
   onApprove: () => void;
   onRemove: () => void;
+  /** Super-admin only — omitted entirely on /admin/qa. */
+  onEdit?: () => void;
+  onBlockUser?: () => void;
 };
 
-export default function AdminQACard({ item, acting, onApprove, onRemove }: Props) {
+export default function AdminQACard({ item, acting, onApprove, onRemove, onEdit, onBlockUser }: Props) {
   const isQuestion = "title" in item;
 
   return (
@@ -52,13 +56,23 @@ export default function AdminQACard({ item, acting, onApprove, onRemove }: Props
         {item.content}
       </p>
 
-      <div style={{ display: "flex", gap: "8px" }}>
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
         <button onClick={onApprove} disabled={acting} style={{ flex: 1, padding: "9px", borderRadius: "10px", background: "var(--dd-success)", border: "none", color: "#fff", fontSize: "0.8125rem", fontWeight: 600, cursor: acting ? "wait" : "pointer" }}>
           Approve
         </button>
         <button onClick={onRemove} disabled={acting} style={{ flex: 1, padding: "9px", borderRadius: "10px", background: "var(--dd-danger-bg)", border: "1px solid var(--dd-danger-border)", color: "var(--dd-danger)", fontSize: "0.8125rem", fontWeight: 600, cursor: acting ? "wait" : "pointer" }}>
           Remove
         </button>
+        {onEdit && (
+          <button onClick={onEdit} disabled={acting} style={{ flex: 1, padding: "9px", borderRadius: "10px", background: "var(--dd-surface2)", border: "1px solid var(--dd-border2)", color: "var(--dd-text2)", fontSize: "0.8125rem", fontWeight: 600, cursor: acting ? "wait" : "pointer" }}>
+            Edit
+          </button>
+        )}
+        {onBlockUser && (
+          <button onClick={onBlockUser} disabled={acting} style={{ flex: 1, padding: "9px", borderRadius: "10px", background: "var(--dd-danger-bg)", border: "1px solid var(--dd-danger-border)", color: "var(--dd-danger)", fontSize: "0.8125rem", fontWeight: 600, cursor: acting ? "wait" : "pointer" }}>
+            Block user
+          </button>
+        )}
       </div>
     </div>
   );

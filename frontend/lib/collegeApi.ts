@@ -342,6 +342,15 @@ export const collegeApi = {
         apiFetch<{ detail: string }>(`/colleges/reviews/${reviewId}/admin/`, {
           method: "PATCH", body: JSON.stringify({ action, reason }),
         }),
+      /** Super admin only — edit a review's content/ratings in place. */
+      edit: (reviewId: number, fields: {
+        title?: string; content?: string;
+        rating_infrastructure?: number; rating_clinical?: number;
+        rating_hostel?: number; rating_administration?: number; rating_overall?: number;
+      }) =>
+        apiFetch<Review>(`/colleges/reviews/${reviewId}/admin/`, {
+          method: "PATCH", body: JSON.stringify({ action: "edit", ...fields }),
+        }),
     },
   },
 

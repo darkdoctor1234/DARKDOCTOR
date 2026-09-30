@@ -105,13 +105,19 @@ export default function SuperAdminHomePage() {
         <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, overflow: "hidden" }}>
           <button onClick={() => router.push("/about")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", flexShrink: 0 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Darkdoctor" draggable={false}
-              style={{ height: "28px", width: "auto", objectFit: "contain" }} />
+            <span style={{ display: "inline-flex" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" className="dd-logo-light" alt="Darkdoctor" draggable={false}
+              style={{ height: "46px", width: "auto", objectFit: "contain" }} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo-dark.png" className="dd-logo-dark" alt="Darkdoctor" draggable={false}
+              style={{ height: "46px", width: "auto", objectFit: "contain" }} />
+            </span>
           </button>
           <span style={{
             fontSize: "0.6875rem", padding: "2px 8px", borderRadius: "20px",
-            background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.28)",
-            color: "#7c3aed", fontWeight: 500, letterSpacing: "0.03em",
+            background: "rgba(172,36,48,0.1)", border: "1px solid rgba(172,36,48,0.28)",
+            color: "#ac2430", fontWeight: 500, letterSpacing: "0.03em",
           }}>SUPER ADMIN</span>
         </div>
 
@@ -177,11 +183,27 @@ export default function SuperAdminHomePage() {
               onClick={() => router.push("/superadmin/admins")}
               hoverRgb="124,58,237" glowRgb="124,58,237"
               icon={
-                <ModuleIcon gradient="linear-gradient(135deg,#7c3aed 0%,#8b5cf6 100%)" glow="rgba(124,58,237,0.35)">
+                <ModuleIcon gradient="linear-gradient(135deg,#ac2430 0%,#c9424e 100%)" glow="rgba(172,36,48,0.35)">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
                     <circle cx="9" cy="7" r="4"/>
                     <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+                  </svg>
+                </ModuleIcon>
+              }
+            />
+
+            <ModuleCard
+              title="User Management"
+              description="Search any user, and block or unblock their account instantly."
+              onClick={() => router.push("/superadmin/users")}
+              hoverRgb="255,159,10" glowRgb="255,159,10"
+              icon={
+                <ModuleIcon gradient="linear-gradient(135deg,#ff9f0a 0%,#ff375f 100%)" glow="rgba(255,159,10,0.32)">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="8" r="4"/>
+                    <path d="M4 21v-1a8 8 0 0116 0v1"/>
+                    <line x1="4.5" y1="4.5" x2="19.5" y2="19.5"/>
                   </svg>
                 </ModuleIcon>
               }
@@ -193,7 +215,7 @@ export default function SuperAdminHomePage() {
               onClick={() => router.push("/colleges")}
               hoverRgb="13,148,136" glowRgb="13,148,136"
               icon={
-                <ModuleIcon gradient="linear-gradient(135deg,#0d9488 0%,#7c3aed 100%)" glow="rgba(13,148,136,0.35)">
+                <ModuleIcon gradient="linear-gradient(135deg,#0d9488 0%,#ac2430 100%)" glow="rgba(13,148,136,0.35)">
                   <svg width="20" height="20" viewBox="0 0 34 34" fill="none" stroke="white" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M17 4L3 11l14 7 14-7-14-7z" fill="none"/>
                     <path d="M3 11v10l14 7 14-7V11" fill="none"/>
@@ -269,7 +291,7 @@ export default function SuperAdminHomePage() {
               onClick={() => router.push("/superadmin/communities")}
               hoverRgb="124,58,237" glowRgb="124,58,237"
               icon={
-                <ModuleIcon gradient="linear-gradient(135deg,#7c3aed 0%,#a78bfa 100%)" glow="rgba(124,58,237,0.32)">
+                <ModuleIcon gradient="linear-gradient(135deg,#ac2430 0%,#d97a83 100%)" glow="rgba(172,36,48,0.32)">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
                     <circle cx="9" cy="7" r="4"/>

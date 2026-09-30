@@ -20,6 +20,26 @@ export type StatusValue = typeof STATUS_OPTIONS[number]["value"] | "";
  * UserProfile.COMMUNITY_ELIGIBLE_STATUSES on the backend. Never UG. */
 export const COMMUNITY_ELIGIBLE_STATUSES: StatusValue[] = ["pg_student", "working_professional", "alumni", "faculty"];
 
+/** Which year of the course someone is currently in — distinct from Batch
+ * (their admission year). Only meaningful for ug_student/pg_student; UG and
+ * PG show different subsets since PG has no 4th/Final/Internship year. */
+export const UG_YEAR_OPTIONS = [
+  { value: "1",          label: "1st Year" },
+  { value: "2",          label: "2nd Year" },
+  { value: "3",          label: "3rd Year" },
+  { value: "4",          label: "4th Year" },
+  { value: "final",      label: "Final Year" },
+  { value: "internship", label: "Internship" },
+] as const;
+
+export const PG_YEAR_OPTIONS = [
+  { value: "1", label: "1st Year" },
+  { value: "2", label: "2nd Year" },
+  { value: "3", label: "3rd Year" },
+] as const;
+
+export type YearOfStudyValue = typeof UG_YEAR_OPTIONS[number]["value"] | "";
+
 /* ── Types ── */
 export interface UserProfile {
   has_profile:       boolean;
@@ -37,10 +57,44 @@ export interface UserProfile {
   pg_college_locked?: boolean;
   pg_department:     string;
   batch:             string;
+  year_of_study:     YearOfStudyValue;
   phone:             string;
   address:           string;
   created_at?:       string;
   updated_at?:       string;
+}
+
+/** A user's public Q&A activity — reviews are never included, they stay
+ * fully anonymous everywhere (see PublicProfileView on the backend). */
+export interface PublicQuestion {
+  id:            number;
+  college:       number;
+  college_name:  string;
+  kind:          "question" | "discussion";
+  title:         string;
+  content:       string;
+  answer_count:  number;
+  created_at:    string;
+}
+
+export interface PublicAnswer {
+  id:             number;
+  question:       number;
+  question_title: string;
+  college:        number;
+  college_name:   string;
+  content:        string;
+  created_at:     string;
+}
+
+export interface PublicProfile {
+  username:                string;
+  current_status:          string;
+  current_status_display:  string;
+  ug_college_name:         string | null;
+  pg_college_name:         string | null;
+  questions:                PublicQuestion[];
+  answers:                  PublicAnswer[];
 }
 
 export interface ProfilePayload {
@@ -52,6 +106,7 @@ export interface ProfilePayload {
   pg_college?:        number | null;
   pg_department?:     string;
   batch?:             string;
+  year_of_study?:     string;
   phone?:             string;
   address?:           string;
 }
@@ -109,4 +164,8 @@ export const profileApi = {
       method: "PATCH",
       body: JSON.stringify(payload),
     }),
+
+  /** Public profile by username — no auth required, works for logged-out visitors too. */
+  getPublic: (username: string) =>
+    apiFetch<PublicProfile>(`/accounts/u/${encodeURIComponent(username)}/`),
 };

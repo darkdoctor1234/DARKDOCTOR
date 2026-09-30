@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getUser, isAuthenticated } from "@/lib/auth";
 import { collegeApi, College } from "@/lib/collegeApi";
 import { profileApi } from "@/lib/profileApi";
+import { matchesQuery } from "@/lib/search";
 import { INDIA_STATES, INDIA_UNION_TERRITORIES } from "@/lib/indiaStates";
 import UserShell from "@/components/UserShell";
 import CollegeCard from "@/components/colleges/CollegeCard";
@@ -25,10 +26,10 @@ function FilterPill({ active, onClick, children }: { active: boolean; onClick: (
         padding: "6px 16px", borderRadius: "20px",
         fontSize: "0.8125rem", fontWeight: 500,
         cursor: "pointer", transition: "all 0.15s",
-        background: active ? "linear-gradient(135deg,#7c3aed 0%,#0d9488 100%)" : "var(--dd-surface2)",
+        background: active ? "linear-gradient(135deg,#ac2430 0%,#0d9488 100%)" : "var(--dd-surface2)",
         border: active ? "1px solid transparent" : "1px solid var(--dd-border)",
         color: active ? "#fff" : "var(--dd-text2)",
-        boxShadow: active ? "0 2px 12px rgba(124,58,237,0.28)" : "none",
+        boxShadow: active ? "0 2px 12px rgba(172,36,48,0.28)" : "none",
         whiteSpace: "nowrap",
       }}
     >
@@ -71,10 +72,10 @@ function StateDropdown({
           display: "flex", alignItems: "center", gap: "6px",
           padding: "6px 28px 6px 12px", borderRadius: "20px",
           fontSize: "0.8125rem", fontWeight: 500, cursor: "pointer",
-          background: active ? "linear-gradient(135deg,#7c3aed 0%,#0d9488 100%)" : "var(--dd-surface2)",
+          background: active ? "linear-gradient(135deg,#ac2430 0%,#0d9488 100%)" : "var(--dd-surface2)",
           border: active ? "1px solid transparent" : "1px solid var(--dd-border)",
           color: active ? "#fff" : "var(--dd-text2)",
-          boxShadow: active ? "0 2px 12px rgba(124,58,237,0.28)" : "none",
+          boxShadow: active ? "0 2px 12px rgba(172,36,48,0.28)" : "none",
           whiteSpace: "nowrap", minWidth: "130px", transition: "all 0.15s",
           position: "relative",
         }}
@@ -97,8 +98,8 @@ function StateDropdown({
           <button type="button" onClick={() => pick("")}
             style={{
               width: "100%", textAlign: "left", padding: "8px 14px",
-              background: !value ? "rgba(124,58,237,0.15)" : "none",
-              border: "none", color: !value ? "#7c3aed" : "var(--dd-text2)",
+              background: !value ? "rgba(172,36,48,0.15)" : "none",
+              border: "none", color: !value ? "#ac2430" : "var(--dd-text2)",
               fontSize: "0.8375rem", cursor: "pointer", fontWeight: !value ? 600 : 400,
               transition: "background 0.1s",
             }}
@@ -113,8 +114,8 @@ function StateDropdown({
             <button key={s} type="button" onClick={() => pick(s)}
               style={{
                 width: "100%", textAlign: "left", padding: "7px 14px",
-                background: value === s ? "rgba(124,58,237,0.15)" : "none",
-                border: "none", color: value === s ? "#7c3aed" : "var(--dd-text1)",
+                background: value === s ? "rgba(172,36,48,0.15)" : "none",
+                border: "none", color: value === s ? "#ac2430" : "var(--dd-text1)",
                 fontSize: "0.8375rem", cursor: "pointer", fontWeight: value === s ? 600 : 400,
                 transition: "background 0.1s",
               }}
@@ -130,8 +131,8 @@ function StateDropdown({
             <button key={s} type="button" onClick={() => pick(s)}
               style={{
                 width: "100%", textAlign: "left", padding: "7px 14px",
-                background: value === s ? "rgba(124,58,237,0.15)" : "none",
-                border: "none", color: value === s ? "#7c3aed" : "var(--dd-text1)",
+                background: value === s ? "rgba(172,36,48,0.15)" : "none",
+                border: "none", color: value === s ? "#ac2430" : "var(--dd-text1)",
                 fontSize: "0.8375rem", cursor: "pointer", fontWeight: value === s ? 600 : 400,
                 transition: "background 0.1s",
               }}
@@ -174,16 +175,17 @@ export default function CollegesPage() {
   const [editTarget, setEditTarget]   = useState<College | null>(null);
   const [delTarget, setDelTarget]     = useState<College | null>(null);
 
-  // ── Default-to-own-college: if the signed-in user has a UG/PG college on
-  // their profile, send them straight to it instead of the full directory.
-  // `?all=1` (used by the "Browse all colleges" link and the detail page's
-  // breadcrumb) always skips this and shows the list.
+  // ── Default-to-own-colleges: a signed-in user sees their own UG/PG
+  // college(s) as cards up top instead of the full directory, with an
+  // "All Colleges" button to see everything. `?all=1` (used by that button
+  // and the detail page's breadcrumb) always skips straight to the list.
   // Starts `false` (matching the server-rendered pass, which never knows
   // about sessionStorage) and only flips true client-side inside an effect —
   // computing it from isAuthenticated() directly in useState's initializer
   // would run during SSR too and produce a different result there than on
   // the client, breaking hydration.
   const [checkingDefault, setCheckingDefault] = useState(false);
+  const [ownCollegeIds, setOwnCollegeIds] = useState<number[]>([]);
 
   useEffect(() => {
     setMounted(true);
@@ -192,25 +194,25 @@ export default function CollegesPage() {
   }, []);
 
   useEffect(() => {
-    // Re-reads location directly rather than trusting the `showAll` state
-    // above: both effects fire in the same pass on initial mount, before
-    // that state update has taken effect, so relying on it here would let
-    // this run once against a stale (pre-mount) value of `showAll` and
-    // briefly kick off the own-college redirect even when the URL already
-    // said ?all=1.
-    if (new URLSearchParams(window.location.search).get("all") === "1" || !isAuthenticated()) return;
+    if (!isAuthenticated()) return;
     setCheckingDefault(true);
     let cancelled = false;
     profileApi.get()
       .then((profile) => {
         if (cancelled) return;
-        const ownCollegeId = profile.pg_college ?? profile.ug_college;
-        if (ownCollegeId) { router.replace(`/colleges/${ownCollegeId}`); return; }
-        setCheckingDefault(false);
+        // UG then PG, whichever are actually set — a PG student sees both.
+        const ids = [profile.ug_college, profile.pg_college].filter((id): id is number => !!id);
+        setOwnCollegeIds(ids);
       })
-      .catch(() => { if (!cancelled) setCheckingDefault(false); });
+      .finally(() => { if (!cancelled) setCheckingDefault(false); });
     return () => { cancelled = true; };
-  }, [showAll, router]);
+  }, []);
+
+  const showOwnColleges = mounted && !showAll && ownCollegeIds.length > 0;
+  function browseAllColleges() {
+    setShowAll(true);
+    router.replace("/colleges?all=1");
+  }
 
   const superAdmin = user?.role === "super_admin";
 
@@ -224,10 +226,7 @@ export default function CollegesPage() {
   useEffect(() => { loadColleges(); }, [loadColleges]);
 
   const filtered = colleges
-    .filter((c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.location.toLowerCase().includes(search.toLowerCase()),
-    )
+    .filter((c) => matchesQuery(search, c.name, c.location))
     .filter((c) => { if (level === "ug") return c.is_ug; if (level === "pg") return c.is_pg; return true; })
     .filter((c) => { if (course === "mbbs") return c.has_mbbs; if (course === "dental") return c.has_dental; if (course === "nursing") return c.has_nursing; return true; })
     .filter((c) => { if (collegeType === "govt") return c.college_type === "govt"; if (collegeType === "private") return c.college_type === "private"; return true; })
@@ -239,7 +238,7 @@ export default function CollegesPage() {
   function clearFilters() { setLevel("all"); setCourse("all"); setCollegeType("all"); setStateFilter(""); setSearch(""); }
 
   const accessBadge = mounted && superAdmin
-    ? { label: "Read & Write", color: "#7c3aed", bg: "rgba(124,58,237,0.12)", border: "rgba(124,58,237,0.25)" }
+    ? { label: "Read & Write", color: "#ac2430", bg: "rgba(172,36,48,0.12)", border: "rgba(172,36,48,0.25)" }
     : null;
 
   if (checkingDefault) {
@@ -293,6 +292,38 @@ export default function CollegesPage() {
           )}
         </div>
 
+        {showOwnColleges && (
+          <div style={{ marginBottom: "28px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px", flexWrap: "wrap", gap: "10px" }}>
+              <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--dd-text3)", letterSpacing: "0.07em", textTransform: "uppercase" }}>
+                Your College{ownCollegeIds.length > 1 ? "s" : ""}
+              </span>
+              <button onClick={browseAllColleges} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "7px 14px", borderRadius: "10px", background: "var(--dd-surface2)", border: "1px solid var(--dd-border)", color: "var(--dd-text2)", fontSize: "0.8125rem", fontWeight: 500, cursor: "pointer" }}>
+                All Colleges
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 4l4 4-4 4"/></svg>
+              </button>
+            </div>
+            {loading ? (
+              <p style={{ fontSize: "0.875rem", color: "var(--dd-text3)" }}>Loading…</p>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(270px,1fr))", gap: "16px" }}>
+                {ownCollegeIds.map((id) => {
+                  const c = colleges.find((col) => col.id === id);
+                  return c ? (
+                    <CollegeCard
+                      key={c.id} college={c} isSuperAdmin={superAdmin}
+                      onEdit={(col) => { setEditTarget(col); setFormOpen(true); }}
+                      onDelete={(col) => setDelTarget(col)}
+                    />
+                  ) : null;
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {!showOwnColleges && (
+        <>
         {/* Search + Filter toggle */}
         <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "10px" }}>
           <div style={{ position: "relative", flex: 1, maxWidth: "460px" }}>
@@ -317,9 +348,9 @@ export default function CollegesPage() {
             style={{
               display: "flex", alignItems: "center", gap: "7px",
               padding: "10px 16px", borderRadius: "10px", cursor: "pointer",
-              background: filtersOpen ? "rgba(124,58,237,0.12)" : "var(--dd-surface2)",
-              border: `1px solid ${filtersOpen ? "rgba(124,58,237,0.35)" : "var(--dd-border)"}`,
-              color: filtersOpen ? "#7c3aed" : "var(--dd-text2)",
+              background: filtersOpen ? "rgba(172,36,48,0.12)" : "var(--dd-surface2)",
+              border: `1px solid ${filtersOpen ? "rgba(172,36,48,0.35)" : "var(--dd-border)"}`,
+              color: filtersOpen ? "#ac2430" : "var(--dd-text2)",
               fontSize: "0.875rem", fontWeight: 500,
               transition: "all 0.15s", flexShrink: 0,
             }}
@@ -338,7 +369,7 @@ export default function CollegesPage() {
             {activeFilterCount > 0 && (
               <span style={{
                 minWidth: "18px", height: "18px", borderRadius: "9px",
-                background: "linear-gradient(135deg,#7c3aed,#0d9488)",
+                background: "linear-gradient(135deg,#ac2430,#0d9488)",
                 color: "#fff", fontSize: "0.7rem", fontWeight: 700,
                 display: "inline-flex", alignItems: "center", justifyContent: "center",
                 padding: "0 5px",
@@ -487,6 +518,8 @@ export default function CollegesPage() {
               {hasActiveFilter && " · filters active"}
             </p>
           </>
+        )}
+        </>
         )}
       </main>
 

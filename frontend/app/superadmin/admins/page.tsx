@@ -157,8 +157,14 @@ export default function AdminManagementPage() {
         <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, overflow: "hidden" }}>
           <button onClick={() => router.push("/about")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Darkdoctor" draggable={false}
-              style={{ height: "28px", width: "auto", objectFit: "contain" }} />
+            <span style={{ display: "inline-flex" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" className="dd-logo-light" alt="Darkdoctor" draggable={false}
+              style={{ height: "46px", width: "auto", objectFit: "contain" }} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo-dark.png" className="dd-logo-dark" alt="Darkdoctor" draggable={false}
+              style={{ height: "46px", width: "auto", objectFit: "contain" }} />
+            </span>
           </button>
           <span style={{ color: "var(--dd-border2)" }}>/</span>
           <button onClick={() => router.push("/superadmin/home")} style={{
@@ -214,7 +220,7 @@ export default function AdminManagementPage() {
         {/* Stats */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: "12px", marginBottom: "24px" }}>
           {[
-            { label: "Total Accounts", value: admins.length,                                                  color: "#7c3aed" },
+            { label: "Total Accounts", value: admins.length,                                                  color: "#ac2430" },
             { label: "Super Admins",   value: admins.filter((a) => a.role === "super_admin").length,           color: "var(--dd-teal)" },
             { label: "Active",         value: admins.filter((a) => a.is_active).length,                        color: "var(--dd-success)" },
             { label: "Inactive",       value: admins.filter((a) => !a.is_active).length,                       color: "var(--dd-warning)" },
@@ -250,9 +256,9 @@ export default function AdminManagementPage() {
           <button onClick={() => setCreateOpen(true)} style={{
             display: "flex", alignItems: "center", gap: "7px",
             padding: "10px 18px", borderRadius: "10px",
-            background: "linear-gradient(135deg,#7c3aed 0%,#0d9488 100%)",
+            background: "linear-gradient(135deg,#ac2430 0%,#0d9488 100%)",
             border: "none", color: "white", fontSize: "0.9rem", fontWeight: 600,
-            cursor: "pointer", boxShadow: "0 4px 20px rgba(124,58,237,0.3)", whiteSpace: "nowrap",
+            cursor: "pointer", boxShadow: "0 4px 20px rgba(172,36,48,0.3)", whiteSpace: "nowrap",
           }}
             onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.88"; }}
             onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}

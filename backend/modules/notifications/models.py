@@ -8,10 +8,12 @@ class Notification(models.Model):
         REVIEW_REJECTED  = "review_rejected",  "Your review was rejected"
         REVIEW_HELPFUL   = "review_helpful",   "Someone found your review helpful"
         ANSWER_NEW       = "answer_new",       "Someone answered your question"
+        QUESTION_NEW     = "question_new",     "New question at your college"
         DISCUSSION_REPLY = "discussion_reply", "New reply in a discussion you're part of"
         COMMUNITY_COMMENT = "community_comment", "New comment on your community post"
         COLLEGE_CHANGE_APPROVED = "college_change_approved", "Your college change request was approved"
         COLLEGE_CHANGE_REJECTED = "college_change_rejected", "Your college change request was rejected"
+        CONTENT_EDITED   = "content_edited",   "Your content was edited by an admin"
 
     recipient = models.ForeignKey(
         "accounts.User", on_delete=models.CASCADE, related_name="notifications",

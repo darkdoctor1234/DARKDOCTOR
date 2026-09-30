@@ -48,6 +48,14 @@ def _active_membership(user, community_id):
         return None
 
 
+def _can_access_community(user, community_id):
+    """Same access rule as _active_membership, plus a super admin can read
+    and post in any community without being a member — "reply anywhere"."""
+    if user and user.is_authenticated and user.is_super_admin:
+        return True
+    return bool(_active_membership(user, community_id))
+
+
 def _touch_activity(community_id):
     Community.objects.filter(pk=community_id).update(last_activity_at=timezone.now())
 
@@ -134,19 +142,20 @@ class DiscussionPostListCreateView(APIView):
         if not community_id:
             return Response({"detail": "?community=<id> is required."}, status=400)
 
-        membership = _active_membership(request.user, community_id)
-        if not membership:
+        if not _can_access_community(request.user, community_id):
             return Response({"detail": "You're not a member of this community."}, status=403)
 
-        membership.last_seen_at = timezone.now()
-        membership.save(update_fields=["last_seen_at"])
+        membership = _active_membership(request.user, community_id)
+        if membership:
+            membership.last_seen_at = timezone.now()
+            membership.save(update_fields=["last_seen_at"])
 
         qs = _POST_QUERYSET.filter(community_id=community_id, status=DiscussionPost.Status.VISIBLE)
         return Response(DiscussionPostListSerializer(qs, many=True, context={"request": request}).data)
 
     def post(self, request):
         community_id = request.data.get("community")
-        if not _active_membership(request.user, community_id):
+        if not _can_access_community(request.user, community_id):
             return Response({"detail": "You're not a member of this community."}, status=403)
 
         serializer = DiscussionPostCreateSerializer(data=request.data)
@@ -168,7 +177,7 @@ class DiscussionPostDetailView(APIView):
 
     def get(self, request, pk):
         post = get_object_or_404(_POST_QUERYSET, pk=pk)
-        if not _active_membership(request.user, post.community_id):
+        if not _can_access_community(request.user, post.community_id):
             return Response({"detail": "You're not a member of this community."}, status=403)
         return Response(DiscussionPostDetailSerializer(post, context={"request": request}).data)
 
@@ -179,7 +188,7 @@ class PollVoteView(APIView):
 
     def post(self, request, pk):
         post = get_object_or_404(DiscussionPost, pk=pk)
-        if not _active_membership(request.user, post.community_id):
+        if not _can_access_community(request.user, post.community_id):
             return Response({"detail": "You're not a member of this community."}, status=403)
 
         option_id = request.data.get("option")
@@ -211,14 +220,14 @@ class CommunityCommentListCreateView(APIView):
 
     def get(self, request, pk):
         post = get_object_or_404(DiscussionPost, pk=pk)
-        if not _active_membership(request.user, post.community_id):
+        if not _can_access_community(request.user, post.community_id):
             return Response({"detail": "You're not a member of this community."}, status=403)
         comments = post.comments.filter(status=CommunityComment.Status.VISIBLE).select_related("author", "author__profile")
         return Response(CommunityCommentSerializer(comments, many=True, context={"request": request}).data)
 
     def post(self, request, pk):
         post = get_object_or_404(DiscussionPost, pk=pk)
-        if not _active_membership(request.user, post.community_id):
+        if not _can_access_community(request.user, post.community_id):
             return Response({"detail": "You're not a member of this community."}, status=403)
 
         serializer = CommunityCommentCreateSerializer(data=request.data)
@@ -246,7 +255,7 @@ class DiscussionPostReportView(APIView):
 
     def post(self, request, pk):
         post = get_object_or_404(DiscussionPost, pk=pk)
-        if not _active_membership(request.user, post.community_id):
+        if not _can_access_community(request.user, post.community_id):
             return Response({"detail": "You're not a member of this community."}, status=403)
         if DiscussionPostReport.objects.filter(post=post, reporter=request.user).exists():
             return Response({"detail": "You have already reported this post."}, status=400)
@@ -271,7 +280,7 @@ class CommunityCommentReportView(APIView):
 
     def post(self, request, pk):
         comment = get_object_or_404(CommunityComment, pk=pk)
-        if not _active_membership(request.user, comment.post.community_id):
+        if not _can_access_community(request.user, comment.post.community_id):
             return Response({"detail": "You're not a member of this community."}, status=403)
         if CommunityCommentReport.objects.filter(comment=comment, reporter=request.user).exists():
             return Response({"detail": "You have already reported this comment."}, status=400)
@@ -316,7 +325,21 @@ class DiscussionPostAdminActionView(APIView):
             post.status = DiscussionPost.Status.REMOVED
             post.save(update_fields=["status"])
             return Response({"detail": "Post removed."})
-        return Response({"detail": "action must be 'approve' or 'remove'."}, status=400)
+        elif action == "edit":
+            title = request.data.get("title")
+            content = request.data.get("content")
+            if title is not None:
+                post.title = title
+            if content is not None:
+                post.content = content
+            post.save(update_fields=["title", "content"])
+            notify(
+                post.author, "content_edited",
+                f'Your post "{post.title}" was edited by an admin.',
+                url=f"/communities/{post.community_id}/posts/{post.id}", actor=request.user,
+            )
+            return Response(DiscussionPostAdminSerializer(post, context={"request": request}).data)
+        return Response({"detail": "action must be 'approve', 'remove' or 'edit'."}, status=400)
 
 
 class CommunityCommentAdminListView(generics.ListAPIView):
@@ -348,4 +371,15 @@ class CommunityCommentAdminActionView(APIView):
             comment.status = CommunityComment.Status.REMOVED
             comment.save(update_fields=["status"])
             return Response({"detail": "Comment removed."})
-        return Response({"detail": "action must be 'approve' or 'remove'."}, status=400)
+        elif action == "edit":
+            content = request.data.get("content")
+            if content is not None:
+                comment.content = content
+            comment.save(update_fields=["content"])
+            notify(
+                comment.author, "content_edited",
+                f'Your comment on "{comment.post.title}" was edited by an admin.',
+                url=f"/communities/{comment.post.community_id}/posts/{comment.post_id}", actor=request.user,
+            )
+            return Response(CommunityCommentAdminSerializer(comment, context={"request": request}).data)
+        return Response({"detail": "action must be 'approve', 'remove' or 'edit'."}, status=400)

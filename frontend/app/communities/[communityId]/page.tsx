@@ -82,7 +82,7 @@ export default function CommunityFeedPage() {
                 {community ? "You've left this community." : (error || "This community isn't available to you.")}
               </p>
               {community && (
-                <button onClick={handleJoin} style={{ padding: "9px 22px", borderRadius: "10px", background: "linear-gradient(135deg,#7c3aed 0%,#0d9488 100%)", border: "none", color: "#fff", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer" }}>
+                <button onClick={handleJoin} style={{ padding: "9px 22px", borderRadius: "10px", background: "linear-gradient(135deg,#ac2430 0%,#0d9488 100%)", border: "none", color: "#fff", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer" }}>
                   Rejoin
                 </button>
               )}
@@ -125,9 +125,9 @@ export default function CommunityFeedPage() {
                   style={{
                     display: "flex", alignItems: "center", gap: "6px",
                     padding: "9px 16px", borderRadius: "10px", flexShrink: 0,
-                    background: "linear-gradient(135deg,#7c3aed 0%,#0d9488 100%)",
+                    background: "linear-gradient(135deg,#ac2430 0%,#0d9488 100%)",
                     border: "none", color: "white", fontSize: "0.8125rem", fontWeight: 600,
-                    cursor: "pointer", boxShadow: "0 4px 16px rgba(124,58,237,0.28)", whiteSpace: "nowrap",
+                    cursor: "pointer", boxShadow: "0 4px 16px rgba(172,36,48,0.28)", whiteSpace: "nowrap",
                   }}
                 >
                   <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">

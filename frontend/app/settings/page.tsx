@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import UserShell from "@/components/UserShell";
-import { profileApi, STATUS_OPTIONS, type StatusValue, type UserProfile } from "@/lib/profileApi";
+import { profileApi, STATUS_OPTIONS, type StatusValue, type UserProfile, UG_YEAR_OPTIONS, PG_YEAR_OPTIONS, type YearOfStudyValue } from "@/lib/profileApi";
 import { collegeApi, type College } from "@/lib/collegeApi";
 import { DEPARTMENT_GROUPS } from "@/lib/departments";
 import { authApi } from "@/lib/api";
@@ -11,6 +11,7 @@ import { saveSession, getAccessToken, getRefreshToken, getUser, isAuthenticated,
 import EmailVerifyModal from "@/components/EmailVerifyModal";
 import CollegeChangeRequestModal from "@/components/CollegeChangeRequestModal";
 import { collegeChangeApi, type CollegeField, type CollegeChangeRequestItem } from "@/lib/collegeChangeApi";
+import { matchesQuery } from "@/lib/search";
 
 function collegeFields(status: StatusValue, edu: "ug" | "pg" | "") {
   switch (status) {
@@ -98,9 +99,7 @@ function CollegeSelect({ colleges, value, onChange, label, placeholder }: {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef  = useRef<HTMLUListElement>(null);
   const selectedCollege = colleges.find((c) => c.id === value) ?? null;
-  const filtered = query.trim()
-    ? colleges.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()) || (c.state ?? "").toLowerCase().includes(query.toLowerCase()))
-    : colleges;
+  const filtered = colleges.filter((c) => matchesQuery(query, c.name, c.state));
 
   useEffect(() => {
     function onMouseDown(e: MouseEvent) {
@@ -261,6 +260,7 @@ export default function SettingsPage() {
   const [changeRequestField, setChangeRequestField] = useState<CollegeField | null>(null);
   const [pgDepartment,   setPgDepartment]   = useState("");
   const [batch,          setBatch]          = useState("");
+  const [yearOfStudy,    setYearOfStudy]    = useState<YearOfStudyValue>("");
   const [phone,          setPhone]          = useState("");
   const [address,        setAddress]        = useState("");
   const [saving,         setSaving]         = useState(false);
@@ -271,6 +271,8 @@ export default function SettingsPage() {
 
   const { showUg, showPg, needsEdu } = collegeFields(status, highestEdu);
   const needsBatch = status === "ug_student" || status === "pg_student" || status === "alumni";
+  const showYearOfStudy = status === "ug_student" || status === "pg_student";
+  const yearOptions = status === "pg_student" ? PG_YEAR_OPTIONS : UG_YEAR_OPTIONS;
   const ugColleges = colleges.filter((c) => c.is_ug);
   const pgColleges = colleges.filter((c) => c.is_pg);
 
@@ -285,6 +287,7 @@ export default function SettingsPage() {
     setUgCollegeLocked(!!p.ug_college_locked); setPgCollegeLocked(!!p.pg_college_locked);
     setPgDepartment(p.pg_department ?? "");
     setBatch(p.batch ?? "");
+    setYearOfStudy((p.year_of_study as YearOfStudyValue) ?? "");
     setPhone(p.phone ?? ""); setAddress(p.address ?? "");
   }, []);
 
@@ -327,7 +330,7 @@ export default function SettingsPage() {
     }, 500);
   }
 
-  function handleStatusChange(v: StatusValue) { setStatus(v); setHighestEdu(""); setUgCollege(null); setPgCollege(null); setBatch(""); }
+  function handleStatusChange(v: StatusValue) { setStatus(v); setHighestEdu(""); setUgCollege(null); setPgCollege(null); setBatch(""); setYearOfStudy(""); }
   function handleEduChange(v: "ug" | "pg") { setHighestEdu(v); if (v === "ug") setPgCollege(null); }
 
   async function handleSave(e: React.FormEvent) {
@@ -351,6 +354,7 @@ export default function SettingsPage() {
       pg_college: showPg ? (pgCollege ?? null) : null,
       pg_department: showPg ? pgDepartment : "",
       batch: needsBatch ? batch.trim() : "",
+      year_of_study: showYearOfStudy ? yearOfStudy : "",
       phone: phone.trim(), address: address.trim(),
     };
     try {
@@ -585,8 +589,25 @@ export default function SettingsPage() {
 
             {needsBatch && (
               <div style={{ marginTop: "18px", paddingTop: "16px", borderTop: "1px solid var(--dd-border)" }}>
-                <Label>Batch Year</Label>
+                <Label>Batch <span style={{ fontWeight: 400, color: "var(--dd-text4)" }}>(year you joined)</span></Label>
                 <Input id="settings-batch" value={batch} onChange={setBatch} placeholder="e.g. 2016" />
+              </div>
+            )}
+
+            {showYearOfStudy && (
+              <div style={{ marginTop: "18px", paddingTop: needsBatch ? "0" : "16px", borderTop: needsBatch ? "none" : "1px solid var(--dd-border)" }}>
+                <Label>Year of Study <span style={{ fontWeight: 400, color: "var(--dd-text4)" }}>(optional)</span></Label>
+                <div style={{ position: "relative" }}>
+                  <select
+                    id="settings-year-of-study" name="year_of_study"
+                    value={yearOfStudy} onChange={(e) => setYearOfStudy(e.target.value as YearOfStudyValue)}
+                    style={{ width: "100%", padding: "11px 36px 11px 14px", borderRadius: "12px", background: "var(--dd-input-bg)", border: "1px solid var(--dd-border2)", color: yearOfStudy ? "var(--dd-text1)" : "var(--dd-text4)", fontSize: "0.9375rem", outline: "none", appearance: "none", WebkitAppearance: "none", cursor: "pointer", boxSizing: "border-box" }}
+                  >
+                    <option value="">Select year of study…</option>
+                    {yearOptions.map((y) => <option key={y.value} value={y.value}>{y.label}</option>)}
+                  </select>
+                  <svg style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: "var(--dd-text3)" }} width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 6l4 4 4-4"/></svg>
+                </div>
               </div>
             )}
           </Section>

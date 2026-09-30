@@ -10,6 +10,55 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "role", "created_at"]
 
 
+class UserAdminSerializer(serializers.ModelSerializer):
+    """Super admin's Users page — regular (role=user) accounts only, with
+    enough profile context to make a block/unblock decision."""
+    username = serializers.CharField(read_only=True)
+    current_status_display = serializers.SerializerMethodField()
+    ug_college_name = serializers.SerializerMethodField()
+    pg_college_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            "id", "username", "full_name", "email", "role", "is_active", "blocked_reason",
+            "current_status_display", "ug_college_name", "pg_college_name", "created_at",
+        ]
+        read_only_fields = fields
+
+    def get_current_status_display(self, obj):
+        profile = getattr(obj, "profile", None)
+        return profile.get_current_status_display() if profile else None
+
+    def get_ug_college_name(self, obj):
+        profile = getattr(obj, "profile", None)
+        return profile.ug_college.name if profile and profile.ug_college else None
+
+    def get_pg_college_name(self, obj):
+        profile = getattr(obj, "profile", None)
+        return profile.pg_college.name if profile and profile.pg_college else None
+
+
+class PublicProfileSerializer(serializers.ModelSerializer):
+    """Public (unauthenticated-readable) profile — username and college
+    affiliation only. Never full_name, email, or phone; reviews stay fully
+    anonymous and are never surfaced here (see PublicProfileView)."""
+    username = serializers.CharField(source="user.username", read_only=True)
+    current_status_display = serializers.CharField(source="get_current_status_display", read_only=True)
+    ug_college_name = serializers.SerializerMethodField()
+    pg_college_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserProfile
+        fields = ["username", "current_status", "current_status_display", "ug_college_name", "pg_college_name"]
+
+    def get_ug_college_name(self, obj):
+        return obj.ug_college.name if obj.ug_college else None
+
+    def get_pg_college_name(self, obj):
+        return obj.pg_college.name if obj.pg_college else None
+
+
 class CreateAdminSerializer(serializers.ModelSerializer):
     # No min_length here — validate() below runs the real
     # AUTH_PASSWORD_VALIDATORS policy (see RegisterSerializer for why a
@@ -105,6 +154,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "pg_college_locked",
             "pg_department",
             "batch",
+            "year_of_study",
             "phone",
             "address",
             "created_at",

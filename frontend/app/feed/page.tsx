@@ -9,6 +9,7 @@ import { isAuthenticated, FEED_PREFS_KEY } from "@/lib/auth";
 import ReviewCard from "@/components/colleges/ReviewCard";
 import { communitiesApi, type MyCommunity } from "@/lib/communitiesApi";
 import { useQuickActions, QuickActionsModals, QuickActionsSidebar, FEED_GRID_CSS } from "@/components/QuickActionsSidebar";
+import { matchesQuery } from "@/lib/search";
 
 /* ─────────────────────── section icons (SVG, not emoji — matches the
    app's established icon convention) ── */
@@ -161,12 +162,7 @@ function CollegeSelect({
 
   const selectedCollege = colleges.find((c) => c.id === value) ?? null;
 
-  const filtered = query.trim()
-    ? colleges.filter((c) =>
-        c.name.toLowerCase().includes(query.toLowerCase()) ||
-        (c.state ?? "").toLowerCase().includes(query.toLowerCase())
-      )
-    : colleges;
+  const filtered = colleges.filter((c) => matchesQuery(query, c.name, c.state));
 
   useEffect(() => {
     function onMouseDown(e: MouseEvent) {
@@ -363,6 +359,10 @@ export default function FeedPage() {
   const selectedPgCollege = colleges.find((c) => c.id === pgCollege) ?? null;
   const selectedColleges  = [selectedUgCollege, selectedPgCollege].filter(Boolean) as College[];
   const journeyCard = JOURNEY_CARDS.find((c) => c.value === status);
+  // Signed-in users' feed always reflects their real profile status (edited
+  // via Settings) — "Change preferences" is only for a signed-out guest who
+  // manually picked a preference in the journey flow above.
+  const showChangePrefs = mounted && !isAuthenticated();
 
   useEffect(() => {
     setMounted(true);
@@ -717,15 +717,17 @@ export default function FeedPage() {
                   Questions the medical community is asking right now.
                 </p>
               </div>
-              <button
-                onClick={resetPrefs}
-                style={{ display: "flex", alignItems: "center", gap: "6px", padding: "7px 14px", borderRadius: "10px", background: "var(--dd-surface2)", border: "1px solid var(--dd-border)", color: "var(--dd-text3)", fontSize: "0.8125rem", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--dd-text1)"; e.currentTarget.style.background = "var(--dd-border)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "var(--dd-text3)"; e.currentTarget.style.background = "var(--dd-surface2)"; }}
-              >
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M1 4h14M1 8h14M1 12h14"/></svg>
-                Change preferences
-              </button>
+              {showChangePrefs && (
+                <button
+                  onClick={resetPrefs}
+                  style={{ display: "flex", alignItems: "center", gap: "6px", padding: "7px 14px", borderRadius: "10px", background: "var(--dd-surface2)", border: "1px solid var(--dd-border)", color: "var(--dd-text3)", fontSize: "0.8125rem", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = "var(--dd-text1)"; e.currentTarget.style.background = "var(--dd-border)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = "var(--dd-text3)"; e.currentTarget.style.background = "var(--dd-surface2)"; }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M1 4h14M1 8h14M1 12h14"/></svg>
+                  Change preferences
+                </button>
+              )}
             </div>
 
             {reviewsLoading ? (
@@ -781,15 +783,17 @@ export default function FeedPage() {
                   {journeyCard ? journeyCard.label : "My"} Feed
                 </h1>
               </div>
-              <button
-                onClick={resetPrefs}
-                style={{ display: "flex", alignItems: "center", gap: "6px", padding: "7px 14px", borderRadius: "10px", background: "var(--dd-surface2)", border: "1px solid var(--dd-border)", color: "var(--dd-text3)", fontSize: "0.8125rem", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--dd-text1)"; e.currentTarget.style.background = "var(--dd-border)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "var(--dd-text3)"; e.currentTarget.style.background = "var(--dd-surface2)"; }}
-              >
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M1 4h14M1 8h14M1 12h14"/></svg>
-                Change preferences
-              </button>
+              {showChangePrefs && (
+                <button
+                  onClick={resetPrefs}
+                  style={{ display: "flex", alignItems: "center", gap: "6px", padding: "7px 14px", borderRadius: "10px", background: "var(--dd-surface2)", border: "1px solid var(--dd-border)", color: "var(--dd-text3)", fontSize: "0.8125rem", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = "var(--dd-text1)"; e.currentTarget.style.background = "var(--dd-border)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = "var(--dd-text3)"; e.currentTarget.style.background = "var(--dd-surface2)"; }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M1 4h14M1 8h14M1 12h14"/></svg>
+                  Change preferences
+                </button>
+              )}
             </div>
 
             {selectedColleges.length > 0 && (

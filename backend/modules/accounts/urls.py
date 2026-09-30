@@ -1,15 +1,19 @@
 from django.urls import path
 from .views import (
     AdminListCreateView, AdminDetailView, AdminToggleActiveView,
-    ProfileMeView, LeadsListView, LeadsExportView,
+    UserListView, UserToggleActiveView,
+    PublicProfileView, ProfileMeView, LeadsListView, LeadsExportView,
     CollegeChangeRequestCreateView, MyCollegeChangeRequestsView,
     CollegeChangeRequestAdminListView, CollegeChangeRequestActionView,
 )
 
 urlpatterns = [
+    path("u/<str:username>/", PublicProfileView.as_view(), name="public-profile"),
     path("admins/", AdminListCreateView.as_view(), name="admin-list-create"),
     path("admins/<int:pk>/", AdminDetailView.as_view(), name="admin-detail"),
     path("admins/<int:pk>/toggle-active/", AdminToggleActiveView.as_view(), name="admin-toggle-active"),
+    path("users/", UserListView.as_view(), name="user-list"),
+    path("users/<int:pk>/block/", UserToggleActiveView.as_view(), name="user-toggle-active"),
     path("profile/me/", ProfileMeView.as_view(), name="profile-me"),
     path("leads/", LeadsListView.as_view(), name="leads-list"),
     path("leads/export/", LeadsExportView.as_view(), name="leads-export"),

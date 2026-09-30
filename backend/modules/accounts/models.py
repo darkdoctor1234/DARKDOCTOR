@@ -47,6 +47,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.USER)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+    blocked_reason = models.CharField(
+        max_length=300, blank=True, default="",
+        help_text="Super admin's note on why this account was blocked. Reference only — the blocked user can't log in to see it.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -136,7 +140,20 @@ class UserProfile(models.Model):
     )
     batch = models.CharField(
         max_length=20, blank=True, default="",
-        help_text="Batch year, e.g. 2016. Required when current_status is a student or alumni status.",
+        help_text="Batch/admission year, e.g. 2016. Required when current_status is a student or alumni status. Distinct from year_of_study (which year of the course they're currently in) — the two are not the same thing.",
+    )
+
+    class YearOfStudy(models.TextChoices):
+        YEAR_1      = "1",          "1st Year"
+        YEAR_2      = "2",          "2nd Year"
+        YEAR_3      = "3",          "3rd Year"
+        YEAR_4      = "4",          "4th Year"
+        FINAL       = "final",      "Final Year"
+        INTERNSHIP  = "internship", "Internship"
+
+    year_of_study = models.CharField(
+        max_length=15, blank=True, default="", choices=YearOfStudy.choices,
+        help_text="Which year of the course they're currently in — optional, only meaningful for ug_student/pg_student. Not the same as batch (admission year).",
     )
     phone   = models.CharField(max_length=20, blank=True, default="")
     address = models.TextField(blank=True, default="")

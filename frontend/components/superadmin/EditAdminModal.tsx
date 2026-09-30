@@ -275,7 +275,7 @@ export default function EditAdminModal({ admin, onClose, onUpdated }: Props) {
                 disabled={loading}
                 style={{
                   flex: 2, padding: "11px", borderRadius: "10px",
-                  background: loading ? "rgba(13,148,136,0.4)" : "linear-gradient(135deg, #0d9488 0%, #7c3aed 100%)",
+                  background: loading ? "rgba(13,148,136,0.4)" : "linear-gradient(135deg, #0d9488 0%, #ac2430 100%)",
                   border: "none", color: "white",
                   fontSize: "0.9375rem", fontWeight: 600,
                   cursor: loading ? "not-allowed" : "pointer",

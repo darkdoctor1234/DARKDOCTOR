@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { isAuthenticated } from "@/lib/auth";
 import { questionsApi, type Question, type Answer, type ReportReason } from "@/lib/questionsApi";
 import UserShell from "@/components/UserShell";
+import UsernameLink from "@/components/UsernameLink";
 import ReportModal from "@/components/colleges/ReportModal";
 
 function ReportButton({ onClick, loggedIn }: { onClick: () => void; loggedIn: boolean }) {
@@ -45,7 +46,7 @@ function timeAgo(iso: string): string {
 
 const KIND_META = {
   question:   { label: "Question",   color: "var(--dd-teal)", bg: "var(--dd-teal-bg2)" },
-  discussion: { label: "Discussion", color: "#7c3aed",        bg: "rgba(124,58,237,0.1)" },
+  discussion: { label: "Discussion", color: "#ac2430",        bg: "rgba(172,36,48,0.1)" },
 } as const;
 
 function AnswerBox({ questionId, onPosted }: { questionId: number; onPosted: (a: Answer) => void }) {
@@ -87,7 +88,7 @@ function AnswerBox({ questionId, onPosted }: { questionId: number; onPosted: (a:
       <button type="submit" disabled={submitting}
         style={{
           alignSelf: "flex-end", padding: "9px 20px", borderRadius: "10px",
-          background: submitting ? "var(--dd-border2)" : "linear-gradient(135deg,#0d9488 0%,#7c3aed 100%)",
+          background: submitting ? "var(--dd-border2)" : "linear-gradient(135deg,#0d9488 0%,#ac2430 100%)",
           border: "none", color: submitting ? "var(--dd-text4)" : "#fff", fontSize: "0.8125rem", fontWeight: 600,
           cursor: submitting ? "not-allowed" : "pointer",
         }}
@@ -162,7 +163,7 @@ export default function QuestionDetailPage() {
                       {kindMeta.label}
                     </span>
                   )}
-                  <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--dd-text1)" }}>{question.display_name}</span>
+                  <UsernameLink name={question.display_name} />
                   {question.is_mine && (
                     <span style={{ fontSize: "0.68rem", fontWeight: 600, padding: "1px 7px", borderRadius: "20px", background: "var(--dd-teal-bg2)", color: "var(--dd-teal)" }}>You</span>
                   )}
@@ -189,7 +190,7 @@ export default function QuestionDetailPage() {
                     {answers.map((a) => (
                       <div key={a.id} style={{ padding: "13px 16px", borderRadius: "12px", background: "var(--dd-bg2)", border: "1px solid var(--dd-border)" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "5px" }}>
-                          <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--dd-text2)" }}>{a.display_name}</span>
+                          <UsernameLink name={a.display_name} size="0.8125rem" color="var(--dd-text2)" />
                           {a.is_mine && (
                             <span style={{ fontSize: "0.65rem", fontWeight: 600, padding: "1px 6px", borderRadius: "20px", background: "var(--dd-teal-bg2)", color: "var(--dd-teal)" }}>You</span>
                           )}

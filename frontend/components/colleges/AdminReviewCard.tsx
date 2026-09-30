@@ -19,16 +19,19 @@ interface Props {
   onApprove: () => void;
   onReject: (reason: string) => void;
   onRemove: () => void;
+  /** Super-admin only — omitted entirely on /admin/reviews. */
+  onEdit?: () => void;
+  onBlockUser?: () => void;
 }
 
-export default function AdminReviewCard({ review, mode, acting, onApprove, onReject, onRemove }: Props) {
+export default function AdminReviewCard({ review, mode, acting, onApprove, onReject, onRemove, onEdit, onBlockUser }: Props) {
   const router = useRouter();
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
 
-  const accent = mode === "reported" ? "var(--dd-warning)" : mode === "pending" ? "#7c3aed" : "var(--dd-text3)";
-  const accentBg = mode === "reported" ? "var(--dd-warning-bg)" : mode === "pending" ? "rgba(124,58,237,0.06)" : "var(--dd-surface)";
-  const accentBorder = mode === "reported" ? "var(--dd-warning-border)" : mode === "pending" ? "rgba(124,58,237,0.22)" : "var(--dd-border)";
+  const accent = mode === "reported" ? "var(--dd-warning)" : mode === "pending" ? "#ac2430" : "var(--dd-text3)";
+  const accentBg = mode === "reported" ? "var(--dd-warning-bg)" : mode === "pending" ? "rgba(172,36,48,0.06)" : "var(--dd-surface)";
+  const accentBorder = mode === "reported" ? "var(--dd-warning-border)" : mode === "pending" ? "rgba(172,36,48,0.22)" : "var(--dd-border)";
 
   function confirmReject() {
     if (!reason.trim()) return;
@@ -100,12 +103,24 @@ export default function AdminReviewCard({ review, mode, acting, onApprove, onRej
             Handled by <strong style={{ color: "var(--dd-text2)" }}>{review.resolved_by_email ?? "-"}</strong>
             {" · "}{new Date(review.updated_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
           </p>
-          <button
-            onClick={() => router.push(`/colleges/${review.college}`)}
-            style={{ padding: "7px 14px", borderRadius: "10px", background: "transparent", border: "1px solid var(--dd-border)", color: "var(--dd-text3)", fontSize: "0.8125rem", cursor: "pointer" }}
-          >
-            View College →
-          </button>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            {onEdit && (
+              <button onClick={onEdit} style={{ padding: "7px 14px", borderRadius: "10px", background: "var(--dd-surface2)", border: "1px solid var(--dd-border2)", color: "var(--dd-text2)", fontSize: "0.8125rem", cursor: "pointer" }}>
+                Edit
+              </button>
+            )}
+            {onBlockUser && (
+              <button onClick={onBlockUser} style={{ padding: "7px 14px", borderRadius: "10px", background: "var(--dd-danger-bg)", border: "1px solid var(--dd-danger-border)", color: "var(--dd-danger)", fontSize: "0.8125rem", cursor: "pointer" }}>
+                Block user
+              </button>
+            )}
+            <button
+              onClick={() => router.push(`/colleges/${review.college}`)}
+              style={{ padding: "7px 14px", borderRadius: "10px", background: "transparent", border: "1px solid var(--dd-border)", color: "var(--dd-text3)", fontSize: "0.8125rem", cursor: "pointer" }}
+            >
+              View College →
+            </button>
+          </div>
         </div>
       ) : rejecting ? (
         <div style={{ paddingTop: "14px", borderTop: "1px solid var(--dd-border)" }}>
@@ -166,6 +181,17 @@ export default function AdminReviewCard({ review, mode, acting, onApprove, onRej
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>
               Remove
+            </button>
+          )}
+
+          {onEdit && (
+            <button onClick={onEdit} disabled={acting} style={{ padding: "9px 14px", borderRadius: "10px", background: "var(--dd-surface2)", border: "1px solid var(--dd-border2)", color: "var(--dd-text2)", fontSize: "0.8125rem", cursor: acting ? "not-allowed" : "pointer" }}>
+              Edit
+            </button>
+          )}
+          {onBlockUser && (
+            <button onClick={onBlockUser} disabled={acting} style={{ padding: "9px 14px", borderRadius: "10px", background: "var(--dd-danger-bg)", border: "1px solid var(--dd-danger-border)", color: "var(--dd-danger)", fontSize: "0.8125rem", cursor: acting ? "not-allowed" : "pointer" }}>
+              Block user
             </button>
           )}
 

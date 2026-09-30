@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { getUser, clearSession, getRefreshToken, getAccessToken, isAuthenticated } from "@/lib/auth";
 import { authApi } from "@/lib/api";
 import { communitiesApi, type AdminDiscussionPost, type AdminCommunityComment } from "@/lib/communitiesApi";
+import EditContentModal from "@/components/superadmin/EditContentModal";
+import BlockUserModal, { BlockTarget } from "@/components/superadmin/BlockUserModal";
 
 const REASON_MAP: Record<string, string> = {
   spam: "Spam or advertisement", offensive: "Offensive or inappropriate",
@@ -23,6 +25,8 @@ export default function FlaggedCommunityContentPage() {
   const [loading,   setLoading]  = useState(true);
   const [acting,    setActing]   = useState<number | null>(null);
   const [toast,     setToast]    = useState("");
+  const [editTarget, setEditTarget] = useState<{ kind: "post" | "comment"; item: AdminDiscussionPost | AdminCommunityComment } | null>(null);
+  const [blockTarget, setBlockTarget] = useState<BlockTarget | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated()) { router.replace("/superadmin"); return; }
@@ -92,7 +96,7 @@ export default function FlaggedCommunityContentPage() {
           </button>
           <span style={{ color: "var(--dd-border2)" }}>/</span>
           <span style={{ fontSize: "0.875rem", color: "var(--dd-text1)", fontWeight: 600 }}>Flagged Communities Content</span>
-          <span style={{ fontSize: "0.6875rem", padding: "2px 8px", borderRadius: "20px", background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.28)", color: "#7c3aed", fontWeight: 500 }}>SUPER ADMIN</span>
+          <span style={{ fontSize: "0.6875rem", padding: "2px 8px", borderRadius: "20px", background: "rgba(172,36,48,0.1)", border: "1px solid rgba(172,36,48,0.28)", color: "#ac2430", fontWeight: 500 }}>SUPER ADMIN</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
           <span className="dd-admin-nav-email" style={{ fontSize: "0.8125rem", color: "var(--dd-text3)" }}>{user?.email}</span>
@@ -118,17 +122,17 @@ export default function FlaggedCommunityContentPage() {
         <div style={{ display: "flex", gap: "8px", marginBottom: "24px" }}>
           <button onClick={() => setTab("posts")} style={{
             padding: "8px 18px", borderRadius: "20px", fontSize: "0.8125rem", fontWeight: 600, cursor: "pointer",
-            background: tab === "posts" ? "rgba(124,58,237,0.12)" : "var(--dd-surface2)",
-            border: `1px solid ${tab === "posts" ? "rgba(124,58,237,0.3)" : "var(--dd-border2)"}`,
-            color: tab === "posts" ? "#7c3aed" : "var(--dd-text2)",
+            background: tab === "posts" ? "rgba(172,36,48,0.12)" : "var(--dd-surface2)",
+            border: `1px solid ${tab === "posts" ? "rgba(172,36,48,0.3)" : "var(--dd-border2)"}`,
+            color: tab === "posts" ? "#ac2430" : "var(--dd-text2)",
           }}>
             Posts <span className="num">({posts.length})</span>
           </button>
           <button onClick={() => setTab("comments")} style={{
             padding: "8px 18px", borderRadius: "20px", fontSize: "0.8125rem", fontWeight: 600, cursor: "pointer",
-            background: tab === "comments" ? "rgba(124,58,237,0.12)" : "var(--dd-surface2)",
-            border: `1px solid ${tab === "comments" ? "rgba(124,58,237,0.3)" : "var(--dd-border2)"}`,
-            color: tab === "comments" ? "#7c3aed" : "var(--dd-text2)",
+            background: tab === "comments" ? "rgba(172,36,48,0.12)" : "var(--dd-surface2)",
+            border: `1px solid ${tab === "comments" ? "rgba(172,36,48,0.3)" : "var(--dd-border2)"}`,
+            color: tab === "comments" ? "#ac2430" : "var(--dd-text2)",
           }}>
             Comments <span className="num">({comments.length})</span>
           </button>
@@ -172,6 +176,8 @@ export default function FlaggedCommunityContentPage() {
                     acting={acting === post.id}
                     onApprove={() => handlePostAction(post.id, "approve")}
                     onRemove={() => handlePostAction(post.id, "remove")}
+                    onEdit={() => setEditTarget({ kind: "post", item: post })}
+                    onBlockUser={() => setBlockTarget({ id: post.author, label: post.display_name || post.author_email, is_active: true })}
                   />
                 </div>
               ))}
@@ -205,12 +211,36 @@ export default function FlaggedCommunityContentPage() {
                   acting={acting === c.id}
                   onApprove={() => handleCommentAction(c.id, "approve")}
                   onRemove={() => handleCommentAction(c.id, "remove")}
+                  onEdit={() => setEditTarget({ kind: "comment", item: c })}
+                  onBlockUser={() => setBlockTarget({ id: c.author, label: c.display_name || c.author_email, is_active: true })}
                 />
               </div>
             ))}
           </div>
         )}
       </main>
+
+      <EditContentModal
+        open={!!editTarget}
+        heading={editTarget?.kind === "post" ? "Edit Post" : "Edit Comment"}
+        initialTitle={editTarget?.kind === "post" ? (editTarget.item as AdminDiscussionPost).title : undefined}
+        initialContent={editTarget?.item.content ?? ""}
+        onClose={() => setEditTarget(null)}
+        onSave={async (values) => {
+          if (!editTarget) return;
+          if (editTarget.kind === "post") {
+            const updated = await communitiesApi.posts.edit(editTarget.item.id, { title: values.title, content: values.content });
+            setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+          } else {
+            const updated = await communitiesApi.comments.edit(editTarget.item.id, { content: values.content });
+            setComments((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+          }
+          showToast("Content updated.");
+        }}
+      />
+
+      <BlockUserModal target={blockTarget} onClose={() => setBlockTarget(null)}
+        onDone={() => showToast("User account updated.")} />
 
       <style>{`
         @media (max-width: 560px) {
@@ -221,9 +251,11 @@ export default function FlaggedCommunityContentPage() {
   );
 }
 
-function ActionRow({ acting, onApprove, onRemove }: { acting: boolean; onApprove: () => void; onRemove: () => void }) {
+function ActionRow({ acting, onApprove, onRemove, onEdit, onBlockUser }: {
+  acting: boolean; onApprove: () => void; onRemove: () => void; onEdit: () => void; onBlockUser: () => void;
+}) {
   return (
-    <div style={{ display: "flex", gap: "10px", alignItems: "center", paddingTop: "14px", borderTop: "1px solid var(--dd-border)" }}>
+    <div style={{ display: "flex", gap: "10px", alignItems: "center", paddingTop: "14px", borderTop: "1px solid var(--dd-border)", flexWrap: "wrap" }}>
       <button
         onClick={onApprove}
         disabled={acting}
@@ -243,6 +275,12 @@ function ActionRow({ acting, onApprove, onRemove }: { acting: boolean; onApprove
       >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>
         Remove
+      </button>
+      <button onClick={onEdit} style={{ padding: "9px 18px", borderRadius: "10px", background: "var(--dd-surface2)", border: "1px solid var(--dd-border2)", color: "var(--dd-text2)", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer" }}>
+        Edit
+      </button>
+      <button onClick={onBlockUser} style={{ padding: "9px 18px", borderRadius: "10px", background: "var(--dd-danger-bg)", border: "1px solid var(--dd-danger-border)", color: "var(--dd-danger)", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer" }}>
+        Block user
       </button>
     </div>
   );

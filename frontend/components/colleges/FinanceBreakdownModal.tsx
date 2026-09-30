@@ -58,8 +58,8 @@ export default function FinanceBreakdownModal({
   );
 
   const isFee         = kind === "fee";
-  const accentColor   = isFee ? "#15803d" : "#7c3aed";
-  const accentGlow    = isFee ? "rgba(21,128,61,0.22)" : "rgba(124,58,237,0.22)";
+  const accentColor   = isFee ? "#15803d" : "#ac2430";
+  const accentGlow    = isFee ? "rgba(21,128,61,0.22)" : "rgba(172,36,48,0.22)";
   const periodLabel   = isFee ? "₹/yr" : "₹/mo";
   const amountLabel   = isFee ? "Annual Fee" : "Monthly Stipend";
   const title         = isFee ? "Fee Breakdown" : "Stipend Breakdown";

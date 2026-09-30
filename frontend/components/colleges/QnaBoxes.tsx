@@ -28,7 +28,7 @@ export default function QnaBoxes({ questions, loading, showCollege, showAsker, o
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px", marginBottom: "18px" }}>
         {([
           { key: "questions" as const,   label: "Questions",            count: questionsOnly.length,   color: "#0d9488" },
-          { key: "discussions" as const, label: "Discussions",          count: discussionsOnly.length,  color: "#7c3aed" },
+          { key: "discussions" as const, label: "Discussions",          count: discussionsOnly.length,  color: "#ac2430" },
           { key: "unanswered" as const,  label: "Unanswered Questions", count: unanswered.length,       color: "#ff9f0a" },
         ]).map((box) => {
           const active = tab === box.key;

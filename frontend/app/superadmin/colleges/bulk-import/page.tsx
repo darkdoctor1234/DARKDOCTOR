@@ -140,8 +140,14 @@ export default function BulkImportPage() {
         <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", minWidth: 0 }}>
           <button onClick={() => router.push("/about")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Darkdoctor" draggable={false}
-              style={{ height: "28px", width: "auto", objectFit: "contain" }} />
+            <span style={{ display: "inline-flex" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" className="dd-logo-light" alt="Darkdoctor" draggable={false}
+              style={{ height: "46px", width: "auto", objectFit: "contain" }} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo-dark.png" className="dd-logo-dark" alt="Darkdoctor" draggable={false}
+              style={{ height: "46px", width: "auto", objectFit: "contain" }} />
+            </span>
           </button>
           <span style={{ color: "var(--dd-border2)" }}>/</span>
           <span style={{ fontSize: "0.9375rem", fontWeight: 500, color: "var(--dd-text2)" }}>Home</span>

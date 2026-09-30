@@ -176,6 +176,7 @@ class QuestionAnswerTests(TestCase):
         self.asker = User.objects.create_user(email="asker@example.com", password="x", username="asker1")
         self.answerer = User.objects.create_user(email="answerer@example.com", password="x", username="answerer1")
         self.admin = User.objects.create_user(email="qaadmin@example.com", password="x", username="qaadmin", role=User.Role.ADMIN)
+        UserProfile.objects.create(user=self.answerer, ug_college=self.college)
 
     def test_authenticated_user_can_post_question(self):
         self.client.force_authenticate(user=self.asker)

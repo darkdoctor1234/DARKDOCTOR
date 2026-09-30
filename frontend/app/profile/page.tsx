@@ -95,7 +95,7 @@ export default function ProfilePage() {
               Sign in to manage your profile, track your progress, and connect with the Darkdoctor community.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%" }}>
-              <button onClick={() => router.push("/login")} style={{ padding: "12px", borderRadius: "13px", background: "linear-gradient(135deg,#0d9488 0%,#7c3aed 100%)", border: "none", color: "#fff", fontSize: "0.9375rem", fontWeight: 600, cursor: "pointer", boxShadow: "0 4px 20px rgba(13,148,136,0.24)" }}>Sign In</button>
+              <button onClick={() => router.push("/login")} style={{ padding: "12px", borderRadius: "13px", background: "linear-gradient(135deg,#0d9488 0%,#ac2430 100%)", border: "none", color: "#fff", fontSize: "0.9375rem", fontWeight: 600, cursor: "pointer", boxShadow: "0 4px 20px rgba(13,148,136,0.24)" }}>Sign In</button>
               <button onClick={() => router.push("/signup")} style={{ padding: "12px", borderRadius: "13px", background: "var(--dd-surface2)", border: "1px solid var(--dd-border2)", color: "var(--dd-text1)", fontSize: "0.9375rem", fontWeight: 500, cursor: "pointer" }}>Create Free Account</button>
             </div>
           </div>

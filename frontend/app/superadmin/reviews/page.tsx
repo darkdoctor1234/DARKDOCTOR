@@ -6,6 +6,8 @@ import { getUser, clearSession, getRefreshToken, getAccessToken, isAuthenticated
 import { authApi } from "@/lib/api";
 import { collegeApi, Review } from "@/lib/collegeApi";
 import AdminReviewCard from "@/components/colleges/AdminReviewCard";
+import EditContentModal from "@/components/superadmin/EditContentModal";
+import BlockUserModal, { BlockTarget } from "@/components/superadmin/BlockUserModal";
 
 type Tab = "pending" | "reported" | "history";
 
@@ -25,6 +27,8 @@ export default function SuperAdminReviewsPage() {
   const [loading, setLoading] = useState(true);
   const [acting,  setActing]  = useState<number | null>(null);
   const [toast,   setToast]   = useState("");
+  const [editTarget, setEditTarget] = useState<Review | null>(null);
+  const [blockTarget, setBlockTarget] = useState<BlockTarget | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated()) { router.replace("/superadmin"); return; }
@@ -88,6 +92,11 @@ export default function SuperAdminReviewsPage() {
     finally { clearSession(); router.replace("/superadmin"); }
   }
 
+  function replaceReview(updated: Review) {
+    const replace = (list: Review[]) => list.map((r) => (r.id === updated.id ? updated : r));
+    setPending(replace); setReported(replace); setHistory(replace);
+  }
+
   const activeList = tab === "pending" ? pending : tab === "reported" ? reported : history;
 
   return (
@@ -113,7 +122,7 @@ export default function SuperAdminReviewsPage() {
           </button>
           <span style={{ color: "var(--dd-border2)" }}>/</span>
           <span style={{ fontSize: "0.875rem", color: "var(--dd-text1)", fontWeight: 600 }}>Review Moderation</span>
-          <span style={{ fontSize: "0.6875rem", padding: "2px 8px", borderRadius: "20px", background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.28)", color: "#7c3aed", fontWeight: 500 }}>SUPER ADMIN</span>
+          <span style={{ fontSize: "0.6875rem", padding: "2px 8px", borderRadius: "20px", background: "rgba(172,36,48,0.1)", border: "1px solid rgba(172,36,48,0.28)", color: "#ac2430", fontWeight: 500 }}>SUPER ADMIN</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
           <span className="dd-admin-nav-email" style={{ fontSize: "0.8125rem", color: "var(--dd-text3)" }}>{user?.email}</span>
@@ -145,9 +154,9 @@ export default function SuperAdminReviewsPage() {
             return (
               <button key={t} onClick={() => setTab(t)} style={{
                 padding: "8px 18px", borderRadius: "20px", fontSize: "0.8125rem", fontWeight: 600, cursor: "pointer",
-                background: active ? "rgba(124,58,237,0.12)" : "var(--dd-surface2)",
-                border: `1px solid ${active ? "rgba(124,58,237,0.3)" : "var(--dd-border2)"}`,
-                color: active ? "#7c3aed" : "var(--dd-text2)",
+                background: active ? "rgba(172,36,48,0.12)" : "var(--dd-surface2)",
+                border: `1px solid ${active ? "rgba(172,36,48,0.3)" : "var(--dd-border2)"}`,
+                color: active ? "#ac2430" : "var(--dd-text2)",
               }}>
                 {TAB_META[t].label} <span className="num">({count})</span>
               </button>
@@ -184,11 +193,40 @@ export default function SuperAdminReviewsPage() {
                 onApprove={() => handleApprove(review)}
                 onReject={(reason) => handleReject(review, reason)}
                 onRemove={() => handleRemove(review)}
+                onEdit={() => setEditTarget(review)}
+                onBlockUser={() => review.user && setBlockTarget({ id: review.user, label: review.user_name || review.user_email || "this user", is_active: true })}
               />
             ))}
           </div>
         )}
       </main>
+
+      <EditContentModal
+        open={!!editTarget}
+        heading="Edit Review"
+        initialTitle={editTarget?.title ?? ""}
+        initialContent={editTarget?.content ?? ""}
+        ratings={editTarget ? [
+          { key: "rating_infrastructure", label: "Infrastructure", value: editTarget.rating_infrastructure },
+          { key: "rating_clinical", label: "Clinical", value: editTarget.rating_clinical },
+          { key: "rating_hostel", label: "Hostel", value: editTarget.rating_hostel },
+          { key: "rating_administration", label: "Administration", value: editTarget.rating_administration },
+          { key: "rating_overall", label: "Overall", value: editTarget.rating_overall },
+        ] : []}
+        onClose={() => setEditTarget(null)}
+        onSave={async (values) => {
+          if (!editTarget) return;
+          const updated = await collegeApi.reviews.admin.edit(editTarget.id, {
+            title: values.title, content: values.content,
+            ...(values.ratings as Record<string, number>),
+          });
+          replaceReview(updated);
+          showToast("Review updated.");
+        }}
+      />
+
+      <BlockUserModal target={blockTarget} onClose={() => setBlockTarget(null)}
+        onDone={() => showToast("User account updated.")} />
 
       <style>{`
         @media (max-width: 560px) {

@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { isAuthenticated } from "@/lib/auth";
 import { communitiesApi, type DiscussionPost, type CommunityComment } from "@/lib/communitiesApi";
 import UserShell from "@/components/UserShell";
+import UsernameLink from "@/components/UsernameLink";
 import ReportButton from "@/components/communities/ReportButton";
 
 function timeAgo(iso: string): string {
@@ -120,7 +121,7 @@ function CommentBox({ postId, onPosted }: { postId: number; onPosted: (c: Commun
       <button type="submit" disabled={submitting}
         style={{
           alignSelf: "flex-end", padding: "9px 20px", borderRadius: "10px",
-          background: submitting ? "var(--dd-border2)" : "linear-gradient(135deg,#7c3aed 0%,#0d9488 100%)",
+          background: submitting ? "var(--dd-border2)" : "linear-gradient(135deg,#ac2430 0%,#0d9488 100%)",
           border: "none", color: submitting ? "var(--dd-text4)" : "#fff", fontSize: "0.8125rem", fontWeight: 600,
           cursor: submitting ? "not-allowed" : "pointer",
         }}
@@ -181,7 +182,7 @@ export default function DiscussionPostPage() {
               {/* Post */}
               <div style={{ padding: "22px 24px", borderRadius: "18px", background: "var(--dd-bg2)", border: "1px solid var(--dd-border)", marginBottom: "20px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--dd-text1)" }}>{post.display_name}</span>
+                  <UsernameLink name={post.display_name} />
                   {post.author_department && (
                     <span style={{ fontSize: "0.72rem", fontWeight: 500, padding: "2px 9px", borderRadius: "20px", background: "var(--dd-surface2)", color: "var(--dd-text2)" }}>
                       {post.author_department}
@@ -220,7 +221,7 @@ export default function DiscussionPostPage() {
                     {post.comments.map((c) => (
                       <div key={c.id} style={{ padding: "13px 16px", borderRadius: "12px", background: "var(--dd-bg2)", border: "1px solid var(--dd-border)" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "5px" }}>
-                          <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--dd-text2)" }}>{c.display_name}</span>
+                          <UsernameLink name={c.display_name} size="0.8125rem" color="var(--dd-text2)" />
                           {c.author_department && (
                             <span style={{ fontSize: "0.68rem", fontWeight: 500, padding: "1px 7px", borderRadius: "20px", background: "var(--dd-surface2)", color: "var(--dd-text3)" }}>
                               {c.author_department}

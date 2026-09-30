@@ -80,7 +80,7 @@ const ACTIONS: { id: QuickAction; label: string; color: string; bg: string; bord
   },
   {
     id: "discuss", label: "Start a Discussion",
-    color: "#7c3aed", bg: "rgba(124,58,237,0.08)", border: "rgba(124,58,237,0.22)",
+    color: "#ac2430", bg: "rgba(172,36,48,0.08)", border: "rgba(172,36,48,0.22)",
     icon: (
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
         <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
@@ -168,7 +168,7 @@ export function QuickActionsSidebar({
             Your Communities
           </span>
           {myCommunities.length > 0 && (
-            <button onClick={() => router.push("/communities")} style={{ background: "none", border: "none", cursor: "pointer", color: "#7c3aed", fontSize: "0.75rem", fontWeight: 600, padding: 0 }}>
+            <button onClick={() => router.push("/communities")} style={{ background: "none", border: "none", cursor: "pointer", color: "#ac2430", fontSize: "0.75rem", fontWeight: 600, padding: 0 }}>
               View all
             </button>
           )}
@@ -185,14 +185,14 @@ export function QuickActionsSidebar({
                 key={c.id}
                 onClick={() => router.push(`/communities/${c.id}`)}
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", width: "100%", padding: "9px 11px", borderRadius: "10px", background: "var(--dd-surface2)", border: "1px solid var(--dd-border)", cursor: "pointer", textAlign: "left", transition: "background 0.15s" }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(124,58,237,0.08)"; }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(172,36,48,0.08)"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = "var(--dd-surface2)"; }}
               >
                 <span style={{ minWidth: 0, flex: 1 }}>
                   <span style={{ display: "block", fontSize: "0.8125rem", fontWeight: 600, color: "var(--dd-text1)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
                   <span style={{ display: "block", fontSize: "0.7rem", color: "var(--dd-text4)", marginTop: "1px" }}>{communityTypeLabel(c.type)} · {c.member_count} members</span>
                 </span>
-                {c.has_unread && <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#7c3aed", flexShrink: 0 }} />}
+                {c.has_unread && <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#ac2430", flexShrink: 0 }} />}
               </button>
             ))}
           </div>
