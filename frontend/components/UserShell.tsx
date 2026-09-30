@@ -52,7 +52,7 @@ const TABS: TabDef[] = [
     id: "communities",
     label: "Communities",
     href: "/communities",
-    color: "#7c3aed",
+    color: "#ac2430",
     icon: (c, s) => (
       <svg width={s} height={s} viewBox="0 0 24 24" fill="none"
         stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -107,7 +107,7 @@ function BottomTab({ tab, active, hasUnreadCommunity, onClick }: {
       <span style={{ position: "relative", display: "flex" }}>
         {tab.icon(isActive ? tab.color : "var(--dd-text4)", 24)}
         {tab.id === "communities" && hasUnreadCommunity && (
-          <span style={{ position: "absolute", top: "-1px", right: "-2px", width: "8px", height: "8px", borderRadius: "50%", background: "#7c3aed", border: "1.5px solid var(--dd-bottom-bg)" }} />
+          <span style={{ position: "absolute", top: "-1px", right: "-2px", width: "8px", height: "8px", borderRadius: "50%", background: "#ac2430", border: "1.5px solid var(--dd-bottom-bg)" }} />
         )}
       </span>
       <span style={{
@@ -273,7 +273,7 @@ function SignupNudge() {
             onClick={() => router.push("/signup")}
             style={{
               padding: "13px 16px", borderRadius: "13px",
-              background: "linear-gradient(135deg,#0d9488 0%,#7c3aed 100%)",
+              background: "linear-gradient(135deg,#0d9488 0%,#ac2430 100%)",
               border: "none", color: "#fff",
               fontSize: "0.9375rem", fontWeight: 600, cursor: "pointer",
               boxShadow: "0 4px 20px rgba(13,148,136,0.32)",
@@ -380,8 +380,11 @@ export default function UserShell({ children }: { children: React.ReactNode }) {
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Darkdoctor" draggable={false}
-              style={{ height: "30px", width: "auto", objectFit: "contain" }} />
+            <img src="/logo.png" alt="Darkdoctor" draggable={false} className="dd-logo-light"
+              style={{ height: "46px", width: "auto", objectFit: "contain" }} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-dark.png" alt="Darkdoctor" draggable={false} className="dd-logo-dark"
+              style={{ height: "46px", width: "auto", objectFit: "contain" }} />
           </button>
 
           {mounted && user?.role === "super_admin" && (
@@ -442,7 +445,7 @@ export default function UserShell({ children }: { children: React.ReactNode }) {
                   <span style={{ position: "relative", display: "flex" }}>
                     {tab.icon(isActive ? tab.color : "var(--dd-text3)", 16)}
                     {tab.id === "communities" && hasUnreadCommunity && (
-                      <span style={{ position: "absolute", top: "-2px", right: "-3px", width: "7px", height: "7px", borderRadius: "50%", background: "#7c3aed", border: "1.5px solid var(--dd-nav-bg)" }} />
+                      <span style={{ position: "absolute", top: "-2px", right: "-3px", width: "7px", height: "7px", borderRadius: "50%", background: "#ac2430", border: "1.5px solid var(--dd-nav-bg)" }} />
                     )}
                   </span>
                   {tab.label}
@@ -462,7 +465,7 @@ export default function UserShell({ children }: { children: React.ReactNode }) {
         )}
 
         {/* ── RIGHT zone ── */}
-        <div className="dd-nav-right" style={{ flex: 1, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "8px" }}>
+        <div className="dd-nav-right" style={{ flex: 1, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "10px" }}>
           {/* Theme toggle — always visible once mounted */}
           {mounted && <ThemeToggle />}
 
@@ -473,13 +476,13 @@ export default function UserShell({ children }: { children: React.ReactNode }) {
                   onClick={() => router.push("/superadmin/home")}
                   style={{
                     padding: "5px 12px", borderRadius: "8px",
-                    background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.22)",
-                    color: "#7c3aed", fontSize: "0.75rem", fontWeight: 500, cursor: "pointer",
+                    background: "rgba(172,36,48,0.1)", border: "1px solid rgba(172,36,48,0.22)",
+                    color: "#ac2430", fontSize: "0.75rem", fontWeight: 500, cursor: "pointer",
                     display: "flex", alignItems: "center", gap: "5px",
                     transition: "background 0.15s",
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(124,58,237,0.18)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(124,58,237,0.1)"; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(172,36,48,0.18)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(172,36,48,0.1)"; }}
                 >
                   <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                     <rect x="1" y="1" width="6" height="6" rx="1"/>

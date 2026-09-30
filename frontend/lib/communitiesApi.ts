@@ -26,7 +26,7 @@ export interface PollOption {
 export interface CommunityComment {
   id:               number;
   post:             number;
-  display_name:     string;  // the commenter's real name — Community is not anonymous
+  display_name:     string;  // the commenter's username (never their real name)
   author_department: string;
   is_mine:          boolean;
   content:          string;
@@ -35,12 +35,14 @@ export interface CommunityComment {
 
 /** Super-admin moderation shapes — adds status/report_count/author_email on top of the public fields. */
 export interface AdminDiscussionPost extends DiscussionPost {
+  author:       number;
   author_email: string;
   status:       "visible" | "flagged" | "removed";
   report_count: number;
 }
 
 export interface AdminCommunityComment extends CommunityComment {
+  author:       number;
   author_email: string;
   post_title:   string;
   status:       "visible" | "flagged" | "removed";
@@ -139,6 +141,10 @@ export const communitiesApi = {
       apiFetch<{ detail: string }>(`/communities/posts/${postId}/admin/`, {
         method: "PATCH", body: JSON.stringify({ action }),
       }),
+    edit: (postId: number, fields: { title?: string; content?: string }) =>
+      apiFetch<AdminDiscussionPost>(`/communities/posts/${postId}/admin/`, {
+        method: "PATCH", body: JSON.stringify({ action: "edit", ...fields }),
+      }),
   },
 
   comments: {
@@ -159,6 +165,10 @@ export const communitiesApi = {
     adminAction: (commentId: number, action: "approve" | "remove") =>
       apiFetch<{ detail: string }>(`/communities/comments/${commentId}/admin/`, {
         method: "PATCH", body: JSON.stringify({ action }),
+      }),
+    edit: (commentId: number, fields: { content?: string }) =>
+      apiFetch<AdminCommunityComment>(`/communities/comments/${commentId}/admin/`, {
+        method: "PATCH", body: JSON.stringify({ action: "edit", ...fields }),
       }),
   },
 };

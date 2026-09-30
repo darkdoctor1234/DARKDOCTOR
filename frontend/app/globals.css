@@ -108,6 +108,14 @@
   color-scheme: dark;
 }
 
+/* ── Theme-aware wordmark logo — the dark-maroon logo ink is unreadable on
+   the dark theme's near-black surfaces, so pages render both variants and
+   toggle visibility here instead of in JS (avoids a hook + hydration state
+   in every page that shows the logo). ── */
+.dd-logo-dark { display: none; }
+[data-theme="dark"] .dd-logo-light { display: none; }
+[data-theme="dark"] .dd-logo-dark  { display: inline-block; }
+
 * {
   box-sizing: border-box;
   margin: 0;

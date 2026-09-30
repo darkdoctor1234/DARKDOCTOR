@@ -6,9 +6,9 @@ from .models import (
 
 
 def _display_name(user) -> str:
-    """Community shows real identity (unlike Review/Q&A) — full name, falling
-    back to username, falling back to a generic label if neither is set."""
-    return user.full_name or user.username or "Doctor"
+    """Username only — never the real name (same as Q&A). Falls back to a
+    generic label if the user somehow has no username."""
+    return user.username or "Doctor"
 
 
 def _author_department(user) -> str:
@@ -192,17 +192,19 @@ class CommunityCommentReportSerializer(serializers.ModelSerializer):
 class DiscussionPostAdminSerializer(DiscussionPostListSerializer):
     """Super-admin moderation queue — adds real author identity (already
     visible via display_name here, unlike Review) plus status/report_count."""
+    author       = serializers.IntegerField(source="author_id", read_only=True)
     author_email = serializers.CharField(source="author.email", read_only=True)
 
     class Meta(DiscussionPostListSerializer.Meta):
-        fields = DiscussionPostListSerializer.Meta.fields + ["author_email", "status", "report_count"]
+        fields = DiscussionPostListSerializer.Meta.fields + ["author", "author_email", "status", "report_count"]
         read_only_fields = fields
 
 
 class CommunityCommentAdminSerializer(CommunityCommentSerializer):
+    author        = serializers.IntegerField(source="author_id", read_only=True)
     author_email  = serializers.CharField(source="author.email", read_only=True)
     post_title    = serializers.CharField(source="post.title", read_only=True)
 
     class Meta(CommunityCommentSerializer.Meta):
-        fields = CommunityCommentSerializer.Meta.fields + ["author_email", "post_title", "status", "report_count"]
+        fields = CommunityCommentSerializer.Meta.fields + ["author", "author_email", "post_title", "status", "report_count"]
         read_only_fields = fields

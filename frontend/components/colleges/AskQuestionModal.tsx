@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { questionsApi, type Question, type QuestionKind } from "@/lib/questionsApi";
 import { collegeApi, type College } from "@/lib/collegeApi";
+import { matchesQuery } from "@/lib/search";
 
 interface Props {
   /** Pre-selected college id (e.g. the user's UG/PG college), if any. Ignored when lockedCollege is set. */
@@ -15,8 +16,9 @@ interface Props {
   onSubmitted: (question: Question) => void;
 }
 
-function CollegeSelect({ colleges, value, onChange }: {
+function CollegeSelect({ colleges, value, onChange, loading, loadError, onRetry }: {
   colleges: College[]; value: number | null; onChange: (id: number | null) => void;
+  loading: boolean; loadError: boolean; onRetry: () => void;
 }) {
   const [open, setOpen]   = useState(false);
   const [query, setQuery] = useState("");
@@ -24,9 +26,7 @@ function CollegeSelect({ colleges, value, onChange }: {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const selected = colleges.find((c) => c.id === value) ?? null;
-  const filtered = query.trim()
-    ? colleges.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()) || (c.state ?? "").toLowerCase().includes(query.toLowerCase()))
-    : colleges;
+  const filtered = colleges.filter((c) => matchesQuery(query, c.name, c.state));
 
   useEffect(() => {
     function onMouseDown(e: MouseEvent) {
@@ -71,7 +71,14 @@ function CollegeSelect({ colleges, value, onChange }: {
             />
           </div>
           <div style={{ overflowY: "auto", flex: 1 }}>
-            {filtered.length === 0 ? (
+            {loading ? (
+              <p style={{ padding: "14px", color: "var(--dd-text4)", fontSize: "0.8125rem", textAlign: "center" }}>Loading colleges…</p>
+            ) : loadError ? (
+              <div style={{ padding: "14px", textAlign: "center" }}>
+                <p style={{ color: "var(--dd-danger)", fontSize: "0.8125rem", marginBottom: "8px" }}>Couldn't load colleges.</p>
+                <button type="button" onClick={onRetry} style={{ padding: "5px 12px", borderRadius: "8px", background: "var(--dd-surface2)", border: "1px solid var(--dd-border2)", color: "var(--dd-text2)", fontSize: "0.75rem", cursor: "pointer" }}>Retry</button>
+              </div>
+            ) : filtered.length === 0 ? (
               <p style={{ padding: "14px", color: "var(--dd-text4)", fontSize: "0.8125rem", textAlign: "center" }}>No colleges found</p>
             ) : filtered.map((c) => {
               const isSelected = c.id === value;
@@ -99,6 +106,8 @@ function CollegeSelect({ colleges, value, onChange }: {
 
 export default function AskQuestionModal({ defaultCollegeId, lockedCollege, initialKind, onClose, onSubmitted }: Props) {
   const [colleges,   setColleges]   = useState<College[]>([]);
+  const [collegesLoading, setCollegesLoading] = useState(true);
+  const [collegesError,   setCollegesError]   = useState(false);
   const [collegeId,  setCollegeId]  = useState<number | null>(lockedCollege ? lockedCollege.id : (defaultCollegeId ?? null));
   const [kind,       setKind]       = useState<QuestionKind>(initialKind ?? "question");
   const [title,      setTitle]      = useState("");
@@ -106,10 +115,17 @@ export default function AskQuestionModal({ defaultCollegeId, lockedCollege, init
   const [submitting, setSubmitting] = useState(false);
   const [error,      setError]      = useState("");
 
-  useEffect(() => {
+  const loadColleges = () => {
     if (lockedCollege) return;
-    collegeApi.list().then(setColleges).catch(() => {});
-  }, [lockedCollege]);
+    setCollegesLoading(true);
+    setCollegesError(false);
+    collegeApi.list()
+      .then(setColleges)
+      .catch(() => setCollegesError(true))
+      .finally(() => setCollegesLoading(false));
+  };
+
+  useEffect(() => { loadColleges(); }, [lockedCollege]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -181,7 +197,8 @@ export default function AskQuestionModal({ defaultCollegeId, lockedCollege, init
           ) : (
             <div>
               <label style={labelStyle}>College</label>
-              <CollegeSelect colleges={colleges} value={collegeId} onChange={setCollegeId} />
+              <CollegeSelect colleges={colleges} value={collegeId} onChange={setCollegeId}
+                loading={collegesLoading} loadError={collegesError} onRetry={loadColleges} />
             </div>
           )}
 

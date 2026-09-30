@@ -71,8 +71,14 @@ export default function LoginPage() {
         <div style={{ textAlign: "center", marginBottom: "32px" }}>
           <button onClick={() => router.push("/")} style={{ background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Darkdoctor" draggable={false}
-              style={{ height: "38px", width: "auto", objectFit: "contain" }} />
+            <span style={{ display: "inline-flex" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" className="dd-logo-light" alt="Darkdoctor" draggable={false}
+              style={{ height: "72px", width: "auto", objectFit: "contain" }} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo-dark.png" className="dd-logo-dark" alt="Darkdoctor" draggable={false}
+              style={{ height: "72px", width: "auto", objectFit: "contain" }} />
+            </span>
           </button>
           <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--dd-text1)", letterSpacing: "-0.03em", marginTop: "20px", marginBottom: "6px" }}>
             Welcome back
@@ -136,7 +142,7 @@ export default function LoginPage() {
           )}
 
           <button type="submit" disabled={loading}
-            style={{ padding: "12px", borderRadius: "12px", background: "linear-gradient(135deg,#0d9488 0%,#7c3aed 100%)", border: "none", color: "#fff", fontSize: "0.9375rem", fontWeight: 600, cursor: loading ? "wait" : "pointer", opacity: loading ? 0.75 : 1, transition: "opacity 0.15s", marginTop: "4px", boxShadow: "0 4px 20px rgba(13,148,136,0.24)" }}>
+            style={{ padding: "12px", borderRadius: "12px", background: "linear-gradient(135deg,#0d9488 0%,#ac2430 100%)", border: "none", color: "#fff", fontSize: "0.9375rem", fontWeight: 600, cursor: loading ? "wait" : "pointer", opacity: loading ? 0.75 : 1, transition: "opacity 0.15s", marginTop: "4px", boxShadow: "0 4px 20px rgba(13,148,136,0.24)" }}>
             {loading ? "Signing in…" : "Sign In"}
           </button>
         </form>

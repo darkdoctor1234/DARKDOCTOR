@@ -348,13 +348,26 @@ class QuestionAdminSerializer(QuestionSerializer):
 class AnswerAdminSerializer(AnswerSerializer):
     """Admin-only — adds real name/email plus enough question context to judge
     the report without a second lookup (title, college)."""
+    user          = serializers.IntegerField(source="user_id", read_only=True)
     user_name     = serializers.CharField(source="user.full_name", read_only=True)
     user_email    = serializers.CharField(source="user.email",     read_only=True)
     question_title = serializers.CharField(source="question.title", read_only=True)
     college_name   = serializers.CharField(source="question.college.name", read_only=True)
 
     class Meta(AnswerSerializer.Meta):
-        fields = AnswerSerializer.Meta.fields + ["status", "report_count", "user_name", "user_email", "question_title", "college_name"]
+        fields = AnswerSerializer.Meta.fields + ["status", "report_count", "user", "user_name", "user_email", "question_title", "college_name"]
+
+
+class AnswerWithContextSerializer(AnswerSerializer):
+    """Public (non-admin) — adds which question/college an answer belongs
+    to, for display on a user's public profile page. No real name/email
+    (unlike AnswerAdminSerializer, which is admin-only)."""
+    question_title = serializers.CharField(source="question.title", read_only=True)
+    college        = serializers.IntegerField(source="question.college_id", read_only=True)
+    college_name   = serializers.CharField(source="question.college.name", read_only=True)
+
+    class Meta(AnswerSerializer.Meta):
+        fields = AnswerSerializer.Meta.fields + ["question_title", "college", "college_name"]
 
 
 class QuestionReportSerializer(serializers.ModelSerializer):

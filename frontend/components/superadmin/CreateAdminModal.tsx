@@ -171,7 +171,7 @@ export default function CreateAdminModal({ open, onClose, onCreated }: Props) {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 style={inputStyle}
-                onFocus={(e) => { e.currentTarget.style.borderColor = "#7c3aed"; e.currentTarget.style.background = "var(--dd-surface2)"; }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = "#ac2430"; e.currentTarget.style.background = "var(--dd-surface2)"; }}
                 onBlur={(e) => { e.currentTarget.style.borderColor = "var(--dd-border2)"; e.currentTarget.style.background = "var(--dd-input-bg)"; }}
               />
             </div>
@@ -188,7 +188,7 @@ export default function CreateAdminModal({ open, onClose, onCreated }: Props) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 style={inputStyle}
-                onFocus={(e) => { e.currentTarget.style.borderColor = "#7c3aed"; e.currentTarget.style.background = "var(--dd-surface2)"; }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = "#ac2430"; e.currentTarget.style.background = "var(--dd-surface2)"; }}
                 onBlur={(e) => { e.currentTarget.style.borderColor = "var(--dd-border2)"; e.currentTarget.style.background = "var(--dd-input-bg)"; }}
               />
             </div>
@@ -207,7 +207,7 @@ export default function CreateAdminModal({ open, onClose, onCreated }: Props) {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   style={{ ...inputStyle, paddingRight: "44px" }}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = "#7c3aed"; e.currentTarget.style.background = "var(--dd-surface2)"; }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "#ac2430"; e.currentTarget.style.background = "var(--dd-surface2)"; }}
                   onBlur={(e) => { e.currentTarget.style.borderColor = "var(--dd-border2)"; e.currentTarget.style.background = "var(--dd-input-bg)"; }}
                 />
                 <button
@@ -274,11 +274,11 @@ export default function CreateAdminModal({ open, onClose, onCreated }: Props) {
                 style={{
                   flex: 2, padding: "11px",
                   borderRadius: "10px",
-                  background: loading ? "rgba(124,58,237,0.4)" : "linear-gradient(135deg, #7c3aed 0%, #0d9488 100%)",
+                  background: loading ? "rgba(172,36,48,0.4)" : "linear-gradient(135deg, #ac2430 0%, #0d9488 100%)",
                   border: "none",
                   color: "white", fontSize: "0.9375rem", fontWeight: 600,
                   cursor: loading ? "not-allowed" : "pointer",
-                  boxShadow: loading ? "none" : "0 4px 20px rgba(124,58,237,0.3)",
+                  boxShadow: loading ? "none" : "0 4px 20px rgba(172,36,48,0.3)",
                   transition: "all 0.2s",
                   opacity: loading ? 0.7 : 1,
                 }}

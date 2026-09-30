@@ -26,7 +26,7 @@ const ACTIONS: {
   },
   {
     id: "discuss", label: "Start a Discussion", description: "Open up a conversation about any college.",
-    color: "#7c3aed", bg: "rgba(124,58,237,0.08)", border: "rgba(124,58,237,0.22)",
+    color: "#ac2430", bg: "rgba(172,36,48,0.08)", border: "rgba(172,36,48,0.22)",
     icon: (
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
         <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
@@ -87,8 +87,12 @@ export default function CreateMenu() {
     setCheckError("");
     try {
       const p = await profileApi.get();
-      const collegeId   = p.pg_college ?? p.ug_college;
-      const collegeName = p.pg_college ? p.pg_college_name : p.ug_college_name;
+      // A PG Aspirant's pg_college is just their target college, not
+      // somewhere they've actually studied — only prefer pg_college when
+      // the status means it's real (currently attending, or completed).
+      const attendedPg  = p.current_status !== "pg_aspirant" && !!p.pg_college;
+      const collegeId   = attendedPg ? p.pg_college : p.ug_college;
+      const collegeName = attendedPg ? p.pg_college_name : p.ug_college_name;
       if (!collegeId) {
         setCheckError("Add your college on your profile first.");
         return;
@@ -110,6 +114,7 @@ export default function CreateMenu() {
         onClick={handleTrigger}
         style={{
           alignItems: "center", gap: "6px",
+          marginLeft: "10px",
           // This button is a direct child of the top <nav>, which is a flex
           // container with the default align-items: stretch (unlike
           // .dd-nav-right's buttons, which sit inside a wrapper that
@@ -117,9 +122,9 @@ export default function CreateMenu() {
           // nav's full height instead of sizing to its own content.
           alignSelf: "center",
           padding: "7px 14px 7px 12px", borderRadius: "9px",
-          background: "linear-gradient(135deg,#7c3aed 0%,#0d9488 100%)",
+          background: "linear-gradient(135deg,#ac2430 0%,#0d9488 100%)",
           border: "none", color: "#fff", fontSize: "0.8125rem", fontWeight: 600,
-          cursor: "pointer", boxShadow: "0 2px 12px rgba(124,58,237,0.28)",
+          cursor: "pointer", boxShadow: "0 2px 12px rgba(172,36,48,0.28)",
           whiteSpace: "nowrap",
         }}
       >
@@ -141,10 +146,10 @@ export default function CreateMenu() {
         aria-label="Create"
         style={{
           width: "56px", height: "56px", borderRadius: "50%",
-          background: "linear-gradient(135deg,#7c3aed 0%,#0d9488 100%)",
+          background: "linear-gradient(135deg,#ac2430 0%,#0d9488 100%)",
           border: "3px solid var(--dd-bottom-bg)",
           alignItems: "center", justifyContent: "center",
-          cursor: "pointer", boxShadow: "0 8px 20px rgba(124,58,237,0.4)",
+          cursor: "pointer", boxShadow: "0 8px 20px rgba(172,36,48,0.4)",
         }}
       >
         <PlusIcon />

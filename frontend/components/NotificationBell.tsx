@@ -72,7 +72,7 @@ export default function NotificationBell() {
   const hasUnread = items.some((n) => !n.is_read);
 
   return (
-    <div className="dd-nav-notif" style={{ display: "flex", alignItems: "center", flexShrink: 0, marginLeft: "8px" }}>
+    <div className="dd-nav-notif" style={{ display: "flex", alignItems: "center", flexShrink: 0, marginLeft: "10px" }}>
       <button
         title="Notifications"
         onClick={toggleOpen}

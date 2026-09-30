@@ -8,8 +8,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import User, UserProfile, CollegeChangeRequest
 from .serializers import (
-    UserSerializer, CreateAdminSerializer, UpdateAdminSerializer,
-    UserProfileSerializer, LeadSerializer,
+    UserSerializer, UserAdminSerializer, CreateAdminSerializer, UpdateAdminSerializer,
+    UserProfileSerializer, PublicProfileSerializer, LeadSerializer,
     CollegeChangeRequestCreateSerializer, CollegeChangeRequestSerializer,
 )
 from modules.authentication.permissions import IsSuperAdmin, IsAdmin
@@ -122,6 +122,84 @@ class AdminToggleActiveView(APIView):
         admin.is_active = not admin.is_active
         admin.save(update_fields=["is_active"])
         return Response(UserSerializer(admin).data)
+
+
+class UserListView(generics.ListAPIView):
+    """Super admin: search/list regular (role=user) accounts — the "block a
+    user any time" page. Not admins/super-admins — see AdminListCreateView
+    for that."""
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdmin]
+    serializer_class = UserAdminSerializer
+
+    def get_queryset(self):
+        qs = User.objects.filter(role=User.Role.USER).select_related("profile", "profile__ug_college", "profile__pg_college")
+        q = self.request.query_params.get("q", "").strip()
+        if q:
+            qs = qs.filter(
+                Q(email__icontains=q) | Q(username__icontains=q) | Q(full_name__icontains=q)
+            )
+        return qs.order_by("-created_at")
+
+
+class UserToggleActiveView(APIView):
+    """Super admin: block/unblock a regular user's account. Setting
+    is_active=False takes effect immediately — rest_framework_simplejwt's
+    JWTAuthentication.get_user() rejects an inactive user's token on their
+    very next request, and every frontend API client already treats a 401
+    as "clear session, redirect to login"."""
+    permission_classes = [permissions.IsAuthenticated, IsSuperAdmin]
+
+    def patch(self, request, pk):
+        try:
+            user = User.objects.get(pk=pk, role=User.Role.USER)
+        except User.DoesNotExist:
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        user.is_active = not user.is_active
+        if not user.is_active:
+            user.blocked_reason = (request.data.get("reason") or "").strip()
+        else:
+            user.blocked_reason = ""
+        user.save(update_fields=["is_active", "blocked_reason"])
+        return Response(UserAdminSerializer(user).data)
+
+
+class PublicProfileView(APIView):
+    """
+    GET /accounts/u/{username}/ — public, no auth required.
+
+    Anyone's username is clickable throughout the app (Q&A questions and
+    answers, which already show real usernames — unlike reviews, which stay
+    fully anonymous everywhere and are deliberately never surfaced here).
+    Returns: username, status, college affiliation, and that user's own
+    questions/answers. Never full_name, email, or phone.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, username):
+        user = User.objects.filter(username__iexact=username).first()
+        if user is None:
+            return Response({"detail": "No user found with that username."}, status=404)
+        profile = getattr(user, "profile", None)
+        if profile is None:
+            return Response({"detail": "This user hasn't set up a profile yet."}, status=404)
+
+        from modules.colleges.models import Question, ModerationStatus
+        from modules.colleges.serializers import QuestionSerializer, AnswerWithContextSerializer
+
+        questions = (
+            Question.objects.filter(user=user, status=ModerationStatus.VISIBLE)
+            .select_related("college").order_by("-created_at")
+        )
+        answers = (
+            user.answers.filter(status=ModerationStatus.VISIBLE)
+            .select_related("question", "question__college").order_by("-created_at")
+        )
+
+        data = PublicProfileSerializer(profile).data
+        data["questions"] = QuestionSerializer(questions, many=True, context={"request": request}).data
+        data["answers"] = AnswerWithContextSerializer(answers, many=True, context={"request": request}).data
+        return Response(data)
 
 
 class ProfileMeView(APIView):

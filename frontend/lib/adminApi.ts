@@ -11,6 +11,20 @@ export interface AdminUser {
   created_at: string;
 }
 
+export interface PlatformUser {
+  id: number;
+  username: string | null;
+  full_name: string;
+  email: string;
+  role: string;
+  is_active: boolean;
+  blocked_reason: string;
+  current_status_display: string | null;
+  ug_college_name: string | null;
+  pg_college_name: string | null;
+  created_at: string;
+}
+
 async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getAccessToken();
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -67,4 +81,15 @@ export const superAdminApi = {
 
   toggleActive: (id: number) =>
     authFetch<AdminUser>(`/accounts/admins/${id}/toggle-active/`, { method: "PATCH" }),
+};
+
+export const usersApi = {
+  list: (q?: string) =>
+    authFetch<PlatformUser[]>(`/accounts/users/${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+
+  toggleBlock: (id: number, reason?: string) =>
+    authFetch<PlatformUser>(`/accounts/users/${id}/block/`, {
+      method: "PATCH",
+      body: JSON.stringify({ reason: reason ?? "" }),
+    }),
 };

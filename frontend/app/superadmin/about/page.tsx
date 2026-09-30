@@ -98,7 +98,7 @@ function EditableSection({
                 placeholder="contact@example.com"
                 style={{
                   width: "100%", padding: "11px 14px", borderRadius: "10px",
-                  background: "var(--dd-input-bg)", border: "1px solid rgba(124,58,237,0.4)",
+                  background: "var(--dd-input-bg)", border: "1px solid rgba(172,36,48,0.4)",
                   color: "var(--dd-text1)", fontSize: "0.9375rem", outline: "none", boxSizing: "border-box",
                 }}
               />
@@ -111,7 +111,7 @@ function EditableSection({
                 placeholder={`Write your ${label.toLowerCase()} here…`}
                 style={{
                   width: "100%", padding: "12px 14px", borderRadius: "10px",
-                  background: "var(--dd-input-bg)", border: "1px solid rgba(124,58,237,0.4)",
+                  background: "var(--dd-input-bg)", border: "1px solid rgba(172,36,48,0.4)",
                   color: "var(--dd-text1)", fontSize: "0.9375rem", outline: "none",
                   resize: "vertical", lineHeight: 1.7, boxSizing: "border-box",
                   fontFamily: "inherit",
@@ -122,7 +122,7 @@ function EditableSection({
             <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
               <button onClick={save} disabled={saving} style={{
                 padding: "8px 18px", borderRadius: "9px",
-                background: saving ? "rgba(124,58,237,0.35)" : "linear-gradient(135deg,#7c3aed 0%,#0d9488 100%)",
+                background: saving ? "rgba(172,36,48,0.35)" : "linear-gradient(135deg,#ac2430 0%,#0d9488 100%)",
                 border: "none", color: "#fff", fontSize: "0.875rem", fontWeight: 600,
                 cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1,
               }}>
@@ -198,7 +198,7 @@ function HandleRow({
 
   if (editing) {
     return (
-      <div style={{ padding: "14px 18px", borderRadius: "12px", background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.2)" }}>
+      <div style={{ padding: "14px 18px", borderRadius: "12px", background: "rgba(172,36,48,0.06)", border: "1px solid rgba(172,36,48,0.2)" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "10px", marginBottom: "10px" }}>
           <select id={`social-platform-${handle.id}`} name="platform" value={platform} onChange={(e) => setPlatform(e.target.value)}
             style={{ padding: "9px 12px", borderRadius: "8px", background: "var(--dd-input-bg)", border: "1px solid var(--dd-border2)", color: "var(--dd-text1)", fontSize: "0.875rem", outline: "none", cursor: "pointer" }}>
@@ -210,7 +210,7 @@ function HandleRow({
         </div>
         {err && <p style={{ color: "var(--dd-danger)", fontSize: "0.78rem", marginBottom: "8px" }}>{err}</p>}
         <div style={{ display: "flex", gap: "8px" }}>
-          <button onClick={save} disabled={saving} style={{ padding: "6px 16px", borderRadius: "8px", background: "linear-gradient(135deg,#7c3aed,#0d9488)", border: "none", color: "#fff", fontSize: "0.8125rem", fontWeight: 600, cursor: "pointer", opacity: saving ? 0.7 : 1 }}>
+          <button onClick={save} disabled={saving} style={{ padding: "6px 16px", borderRadius: "8px", background: "linear-gradient(135deg,#ac2430,#0d9488)", border: "none", color: "#fff", fontSize: "0.8125rem", fontWeight: 600, cursor: "pointer", opacity: saving ? 0.7 : 1 }}>
             {saving ? "Saving…" : "Save"}
           </button>
           <button onClick={() => { setEditing(false); setPlatform(handle.platform); setUrl(handle.url); setErr(null); }} style={{ padding: "6px 16px", borderRadius: "8px", background: "var(--dd-surface2)", border: "1px solid var(--dd-border2)", color: "var(--dd-text2)", fontSize: "0.8125rem", cursor: "pointer" }}>
@@ -366,7 +366,12 @@ export default function SuperAdminAboutPage() {
         <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, overflow: "hidden" }}>
           <button onClick={() => router.push("/about")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", flexShrink: 0 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Darkdoctor" draggable={false} style={{ height: "28px", width: "auto", objectFit: "contain" }} />
+            <span style={{ display: "inline-flex" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" className="dd-logo-light" alt="Darkdoctor" draggable={false} style={{ height: "46px", width: "auto", objectFit: "contain" }} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo-dark.png" className="dd-logo-dark" alt="Darkdoctor" draggable={false} style={{ height: "46px", width: "auto", objectFit: "contain" }} />
+            </span>
           </button>
           <span style={{ color: "var(--dd-border2)" }}>/</span>
           <button onClick={() => router.push("/superadmin/home")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--dd-text2)", fontSize: "0.9375rem", fontWeight: 500, padding: 0 }}

@@ -31,7 +31,7 @@ export default function SuperAdminLoginPage() {
           left: "50%",
           transform: "translateX(-50%)",
           background:
-            "radial-gradient(circle, rgba(124,58,237,0.08) 0%, transparent 70%)",
+            "radial-gradient(circle, rgba(172,36,48,0.08) 0%, transparent 70%)",
           filter: "blur(50px)",
         }}
       />
@@ -60,8 +60,8 @@ export default function SuperAdminLoginPage() {
         <LoginCard
           title="Super Admin Sign In"
           subtitle="Restricted access. Authorized personnel only."
-          accentColor="#7c3aed"
-          accentGlow="rgba(124,58,237,0.3)"
+          accentColor="#ac2430"
+          accentGlow="rgba(172,36,48,0.3)"
           onSubmit={handleLogin}
         />
       </div>

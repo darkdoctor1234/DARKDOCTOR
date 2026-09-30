@@ -74,8 +74,14 @@ export default function AdminDashboardPage() {
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <button onClick={() => router.push("/about")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Darkdoctor" draggable={false}
-              style={{ height: "28px", width: "auto", objectFit: "contain" }} />
+            <span style={{ display: "inline-flex" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" className="dd-logo-light" alt="Darkdoctor" draggable={false}
+              style={{ height: "46px", width: "auto", objectFit: "contain" }} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo-dark.png" className="dd-logo-dark" alt="Darkdoctor" draggable={false}
+              style={{ height: "46px", width: "auto", objectFit: "contain" }} />
+            </span>
           </button>
           <span style={{
             fontSize: "0.6875rem", padding: "2px 8px", borderRadius: "20px",
@@ -114,7 +120,7 @@ export default function AdminDashboardPage() {
         {/* Welcome hero */}
         <div style={{
           borderRadius: "24px",
-          background: "linear-gradient(135deg, rgba(13,148,136,0.08) 0%, rgba(124,58,237,0.06) 100%)",
+          background: "linear-gradient(135deg, rgba(13,148,136,0.08) 0%, rgba(172,36,48,0.06) 100%)",
           border: "1px solid rgba(13,148,136,0.16)",
           padding: "clamp(28px, 5vw, 48px) clamp(24px, 5vw, 48px)",
           marginBottom: "28px",
@@ -177,7 +183,7 @@ export default function AdminDashboardPage() {
               ),
               label: "Email",
               value: user?.email || "-",
-              color: "#7c3aed",
+              color: "#ac2430",
             },
             {
               icon: (
@@ -244,12 +250,12 @@ export default function AdminDashboardPage() {
               {
                 title: "Review Approvals",
                 desc: pendingCount ? `${pendingCount} review${pendingCount === 1 ? "" : "s"} waiting on your decision.` : "Approve or reject newly submitted reviews.",
-                color: "#7c3aed",
-                bg: "rgba(124,58,237,0.08)",
-                border: "rgba(124,58,237,0.22)",
+                color: "#ac2430",
+                bg: "rgba(172,36,48,0.08)",
+                border: "rgba(172,36,48,0.22)",
                 href: "/admin/reviews",
                 icon: (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ac2430" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
                   </svg>
                 ),

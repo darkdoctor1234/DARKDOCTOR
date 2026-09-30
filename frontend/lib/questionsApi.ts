@@ -54,6 +54,7 @@ export interface AdminQuestion extends Question {
 export interface AdminAnswer extends Answer {
   status:         "visible" | "flagged" | "removed";
   report_count:   number;
+  user:           number;
   user_name:      string;
   user_email:     string;
   question_title: string;
@@ -147,6 +148,19 @@ export const questionsApi = {
       apiFetch<{ detail: string }>(`/colleges/answers/${answerId}/admin/`, {
         method: "PATCH",
         body:   JSON.stringify({ action }),
+      }),
+
+    /** Super admin only — edit a question's or answer's content in place. */
+    editQuestion: (questionId: number, fields: { title?: string; content?: string }) =>
+      apiFetch<AdminQuestion>(`/colleges/questions/${questionId}/admin/`, {
+        method: "PATCH",
+        body:   JSON.stringify({ action: "edit", ...fields }),
+      }),
+
+    editAnswer: (answerId: number, fields: { content?: string }) =>
+      apiFetch<AdminAnswer>(`/colleges/answers/${answerId}/admin/`, {
+        method: "PATCH",
+        body:   JSON.stringify({ action: "edit", ...fields }),
       }),
   },
 };

@@ -6,6 +6,8 @@ import { getUser, clearSession, getRefreshToken, getAccessToken, isAuthenticated
 import { authApi } from "@/lib/api";
 import { questionsApi, type AdminQuestion, type AdminAnswer } from "@/lib/questionsApi";
 import AdminQACard from "@/components/colleges/AdminQACard";
+import EditContentModal from "@/components/superadmin/EditContentModal";
+import BlockUserModal, { BlockTarget } from "@/components/superadmin/BlockUserModal";
 
 type Tab = "questions" | "answers";
 
@@ -25,6 +27,8 @@ export default function QAModerationPage({ strictSuperAdmin, homeHref, loginHref
   const [loading, setLoading]     = useState(true);
   const [acting, setActing]       = useState<number | null>(null);
   const [toast, setToast]         = useState("");
+  const [editTarget, setEditTarget] = useState<{ kind: "question" | "answer"; item: AdminQuestion | AdminAnswer } | null>(null);
+  const [blockTarget, setBlockTarget] = useState<BlockTarget | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated()) { router.replace(loginHref); return; }
@@ -76,6 +80,11 @@ export default function QAModerationPage({ strictSuperAdmin, homeHref, loginHref
   }
 
   const activeList = tab === "questions" ? questions : answers;
+
+  function blockTargetFor(item: AdminQuestion | AdminAnswer): BlockTarget | null {
+    if (!item.user) return null;
+    return { id: item.user, label: item.user_name || item.user_email || "this user", is_active: true };
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--dd-bg)", color: "var(--dd-text1)" }}>
@@ -158,22 +167,48 @@ export default function QAModerationPage({ strictSuperAdmin, homeHref, loginHref
             {tab === "questions"
               ? questions.map((q) => (
                   <AdminQACard key={q.id} acting={acting === q.id}
-                    item={{ id: q.id, title: q.title, content: q.content, college_name: q.college_name, report_count: q.report_count, user_name: q.user_name, user_email: q.user_email, created_at: q.created_at }}
+                    item={{ id: q.id, user: q.user, title: q.title, content: q.content, college_name: q.college_name, report_count: q.report_count, user_name: q.user_name, user_email: q.user_email, created_at: q.created_at }}
                     onApprove={() => handleQuestionAction(q.id, "approve")}
                     onRemove={() => handleQuestionAction(q.id, "remove")}
+                    onEdit={strictSuperAdmin ? () => setEditTarget({ kind: "question", item: q }) : undefined}
+                    onBlockUser={strictSuperAdmin ? () => setBlockTarget(blockTargetFor(q)) : undefined}
                   />
                 ))
               : answers.map((a) => (
                   <AdminQACard key={a.id} acting={acting === a.id}
-                    item={{ id: a.id, content: a.content, question_title: a.question_title, college_name: a.college_name, report_count: a.report_count, user_name: a.user_name, user_email: a.user_email, created_at: a.created_at }}
+                    item={{ id: a.id, user: a.user, content: a.content, question_title: a.question_title, college_name: a.college_name, report_count: a.report_count, user_name: a.user_name, user_email: a.user_email, created_at: a.created_at }}
                     onApprove={() => handleAnswerAction(a.id, "approve")}
                     onRemove={() => handleAnswerAction(a.id, "remove")}
+                    onEdit={strictSuperAdmin ? () => setEditTarget({ kind: "answer", item: a }) : undefined}
+                    onBlockUser={strictSuperAdmin ? () => setBlockTarget(blockTargetFor(a)) : undefined}
                   />
                 ))
             }
           </div>
         )}
       </main>
+
+      <EditContentModal
+        open={!!editTarget}
+        heading={editTarget?.kind === "question" ? "Edit Question" : "Edit Answer"}
+        initialTitle={editTarget?.kind === "question" ? (editTarget.item as AdminQuestion).title : undefined}
+        initialContent={editTarget?.item.content ?? ""}
+        onClose={() => setEditTarget(null)}
+        onSave={async (values) => {
+          if (!editTarget) return;
+          if (editTarget.kind === "question") {
+            const updated = await questionsApi.admin.editQuestion(editTarget.item.id, { title: values.title, content: values.content });
+            setQuestions((prev) => prev.map((q) => (q.id === updated.id ? updated : q)));
+          } else {
+            const updated = await questionsApi.admin.editAnswer(editTarget.item.id, { content: values.content });
+            setAnswers((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+          }
+          showToast("Content updated.");
+        }}
+      />
+
+      <BlockUserModal target={blockTarget} onClose={() => setBlockTarget(null)}
+        onDone={() => showToast("User account updated.")} />
 
       <style>{`
         @media (max-width: 560px) {

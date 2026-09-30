@@ -28,6 +28,9 @@ class RegisterSerializer(serializers.Serializer):
     pg_college = serializers.IntegerField(required=False, allow_null=True, default=None)
     pg_department = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
     batch      = serializers.CharField(max_length=20, required=False, allow_blank=True, default="")
+    year_of_study = serializers.ChoiceField(
+        choices=UserProfile.YearOfStudy.choices, required=False, allow_blank=True, default="",
+    )
     phone      = serializers.CharField(max_length=20, required=False, allow_blank=True, default="")
     address    = serializers.CharField(required=False, allow_blank=True, default="")
 
@@ -99,6 +102,7 @@ class RegisterSerializer(serializers.Serializer):
             "highest_education": validated_data.pop("highest_education", ""),
             "pg_department":     validated_data.pop("pg_department",     ""),
             "batch":             validated_data.pop("batch",             ""),
+            "year_of_study":     validated_data.pop("year_of_study",     ""),
             "phone":             validated_data.pop("phone",             ""),
             "address":           validated_data.pop("address",           ""),
         }

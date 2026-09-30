@@ -57,7 +57,7 @@ export default function LoginCard({
           width: "52px",
           height: "52px",
           borderRadius: "14px",
-          background: `linear-gradient(135deg, ${accentColor} 0%, #7c3aed 100%)`,
+          background: `linear-gradient(135deg, ${accentColor} 0%, #ac2430 100%)`,
           boxShadow: `0 0 32px ${accentGlow}, inset 0 1px 0 rgba(255,255,255,0.2)`,
         }}
       >
@@ -224,7 +224,7 @@ export default function LoginCard({
             borderRadius: "12px",
             background: loading
               ? "var(--dd-border2)"
-              : `linear-gradient(135deg, ${accentColor} 0%, #7c3aed 100%)`,
+              : `linear-gradient(135deg, ${accentColor} 0%, #ac2430 100%)`,
             border: "none",
             color: "white",
             fontSize: "0.9375rem",

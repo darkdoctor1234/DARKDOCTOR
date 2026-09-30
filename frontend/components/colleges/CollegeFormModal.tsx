@@ -119,8 +119,8 @@ function DepartmentField({ departments, onChange }: { departments: string[]; onC
           <span key={idx} style={{
             display: "inline-flex", alignItems: "center", gap: "5px",
             padding: "3px 10px 3px 11px", borderRadius: "100px",
-            background: "rgba(124,58,237,0.12)", border: "1px solid rgba(124,58,237,0.28)",
-            color: "#7c3aed", fontSize: "0.8125rem", fontWeight: 500,
+            background: "rgba(172,36,48,0.12)", border: "1px solid rgba(172,36,48,0.28)",
+            color: "#ac2430", fontSize: "0.8125rem", fontWeight: 500,
           }}>
             {dept}
             <button type="button" onClick={(e) => { e.stopPropagation(); remove(idx); }} style={{
@@ -145,8 +145,8 @@ function DepartmentField({ departments, onChange }: { departments: string[]; onC
       {input.trim() && (
         <button type="button" onClick={add} style={{
           marginTop: "7px", padding: "5px 14px", borderRadius: "8px",
-          background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.25)",
-          color: "#7c3aed", fontSize: "0.8125rem", fontWeight: 500, cursor: "pointer",
+          background: "rgba(172,36,48,0.1)", border: "1px solid rgba(172,36,48,0.25)",
+          color: "#ac2430", fontSize: "0.8125rem", fontWeight: 500, cursor: "pointer",
           display: "flex", alignItems: "center", gap: "5px",
         }}>
           <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
@@ -246,7 +246,7 @@ export default function CollegeFormModal({ open, onClose, onSaved, initial }: Co
         if (initial.has_dental)  courses.push("dental");
         if (initial.has_nursing) courses.push("nursing");
         setCourseTypes(courses);
-        setDepartments(initial.departments.map((d) => d.name));
+        setDepartments((initial.departments ?? []).map((d) => d.name));
       } else {
         setName(""); setIntakeSeats(""); setEstablishedYear(""); setLocation(""); setState("");
         setCollegeType(""); setLevels([]); setCourseTypes([]); setDepartments([]);
@@ -323,10 +323,10 @@ export default function CollegeFormModal({ open, onClose, onSaved, initial }: Co
               <div style={{
                 width: "42px", height: "42px", borderRadius: "12px",
                 background: isEdit
-                  ? "linear-gradient(135deg, #0d9488 0%, #7c3aed 100%)"
-                  : "linear-gradient(135deg, #7c3aed 0%, #0d9488 100%)",
+                  ? "linear-gradient(135deg, #0d9488 0%, #ac2430 100%)"
+                  : "linear-gradient(135deg, #ac2430 0%, #0d9488 100%)",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                boxShadow: "0 0 24px rgba(124,58,237,0.3)", flexShrink: 0,
+                boxShadow: "0 0 24px rgba(172,36,48,0.3)", flexShrink: 0,
               }}>
                 {isEdit ? (
                   <svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="white" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -439,7 +439,7 @@ export default function CollegeFormModal({ open, onClose, onSaved, initial }: Co
               onMouseEnter={(e) => { e.currentTarget.style.background = "var(--dd-border)"; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "var(--dd-surface2)"; }}
             >Cancel</button>
-            <button type="submit" form="college-form" disabled={loading} style={{ flex: 2, padding: "12px", borderRadius: "11px", background: loading ? "var(--dd-border2)" : "linear-gradient(135deg, #7c3aed 0%, #0d9488 100%)", border: "none", color: loading ? "var(--dd-text4)" : "white", fontSize: "0.9375rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer", boxShadow: loading ? "none" : "0 4px 24px rgba(124,58,237,0.35)", transition: "all 0.2s" }}>
+            <button type="submit" form="college-form" disabled={loading} style={{ flex: 2, padding: "12px", borderRadius: "11px", background: loading ? "var(--dd-border2)" : "linear-gradient(135deg, #ac2430 0%, #0d9488 100%)", border: "none", color: loading ? "var(--dd-text4)" : "white", fontSize: "0.9375rem", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer", boxShadow: loading ? "none" : "0 4px 24px rgba(172,36,48,0.35)", transition: "all 0.2s" }}>
               {loading ? "Saving…" : isEdit ? "Save Changes" : "Add College"}
             </button>
           </div>

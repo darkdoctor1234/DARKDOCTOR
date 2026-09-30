@@ -47,7 +47,7 @@ function TextInput({
         style={{
           padding: "11px 14px", borderRadius: "10px",
           background: "var(--dd-input-bg)",
-          border: `1px solid ${error ? "rgba(185,28,28,0.5)" : focused ? "rgba(124,58,237,0.55)" : "var(--dd-border2)"}`,
+          border: `1px solid ${error ? "rgba(185,28,28,0.5)" : focused ? "rgba(172,36,48,0.55)" : "var(--dd-border2)"}`,
           color: "var(--dd-text1)", fontSize: "0.9375rem", outline: "none",
           transition: "border-color 0.15s",
           width: "100%", boxSizing: "border-box",
@@ -76,10 +76,10 @@ function PillSingle({
             <button key={opt.value} type="button" onClick={() => onChange(opt.value)} style={{
               padding: "8px 20px", borderRadius: "20px", fontSize: "0.875rem", fontWeight: 500,
               cursor: "pointer", transition: "all 0.15s", border: "1px solid transparent",
-              background: active ? "linear-gradient(135deg,#7c3aed 0%,#0d9488 100%)" : "var(--dd-input-bg)",
+              background: active ? "linear-gradient(135deg,#ac2430 0%,#0d9488 100%)" : "var(--dd-input-bg)",
               borderColor: active ? "transparent" : "var(--dd-border2)",
               color: active ? "#fff" : "var(--dd-text2)",
-              boxShadow: active ? "0 4px 16px rgba(124,58,237,0.3)" : "none",
+              boxShadow: active ? "0 4px 16px rgba(172,36,48,0.3)" : "none",
             }}>
               {opt.label}
             </button>
@@ -109,10 +109,10 @@ function PillMulti({
             <button key={opt.key} type="button" onClick={() => onToggle(opt.key)} style={{
               padding: "8px 20px", borderRadius: "20px", fontSize: "0.875rem", fontWeight: 500,
               cursor: "pointer", transition: "all 0.15s",
-              background: active ? "linear-gradient(135deg,#7c3aed 0%,#0d9488 100%)" : "var(--dd-input-bg)",
+              background: active ? "linear-gradient(135deg,#ac2430 0%,#0d9488 100%)" : "var(--dd-input-bg)",
               border: active ? "1px solid transparent" : `1px solid ${error ? "rgba(185,28,28,0.4)" : "var(--dd-border2)"}`,
               color: active ? "#fff" : "var(--dd-text2)",
-              boxShadow: active ? "0 4px 16px rgba(124,58,237,0.3)" : "none",
+              boxShadow: active ? "0 4px 16px rgba(172,36,48,0.3)" : "none",
             }}>
               {opt.label}
             </button>
@@ -145,13 +145,13 @@ function DepartmentChips({ value, onChange }: { value: string[]; onChange: (v: s
           <span key={d} style={{
             display: "inline-flex", alignItems: "center", gap: "4px",
             padding: "3px 10px", borderRadius: "20px",
-            background: "rgba(124,58,237,0.12)", border: "1px solid rgba(124,58,237,0.3)",
-            color: "#7c3aed", fontSize: "0.8125rem", fontWeight: 500,
+            background: "rgba(172,36,48,0.12)", border: "1px solid rgba(172,36,48,0.3)",
+            color: "#ac2430", fontSize: "0.8125rem", fontWeight: 500,
           }}>
             {d}
             <button type="button" onClick={() => onChange(value.filter((x) => x !== d))} style={{
               background: "none", border: "none", cursor: "pointer",
-              color: "rgba(124,58,237,0.7)", fontSize: "0.9rem", padding: "0 0 0 2px",
+              color: "rgba(172,36,48,0.7)", fontSize: "0.9rem", padding: "0 0 0 2px",
               display: "flex", alignItems: "center", lineHeight: 1,
             }}>&times;</button>
           </span>
@@ -369,7 +369,7 @@ function StateSelect({ value, onChange }: { value: string; onChange: (v: string)
           style={{
             width: "100%", padding: "11px 36px 11px 14px", borderRadius: "10px",
             background: "var(--dd-input-bg)",
-            border: `1px solid ${focused ? "rgba(124,58,237,0.55)" : "var(--dd-border2)"}`,
+            border: `1px solid ${focused ? "rgba(172,36,48,0.55)" : "var(--dd-border2)"}`,
             color: value ? "var(--dd-text1)" : "var(--dd-text3)",
             fontSize: "0.9375rem", outline: "none",
             appearance: "none", WebkitAppearance: "none",
@@ -419,16 +419,16 @@ function StepIndicator({ step }: { step: 1 | 2 }) {
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: "0.75rem", fontWeight: 700,
                 background: done
-                  ? "linear-gradient(135deg,#7c3aed,#0d9488)"
+                  ? "linear-gradient(135deg,#ac2430,#0d9488)"
                   : active
-                    ? "rgba(124,58,237,0.15)"
+                    ? "rgba(172,36,48,0.15)"
                     : "var(--dd-surface2)",
                 border: done
                   ? "none"
                   : active
-                    ? "1.5px solid rgba(124,58,237,0.55)"
+                    ? "1.5px solid rgba(172,36,48,0.55)"
                     : "1.5px solid var(--dd-border2)",
-                color: done ? "#fff" : active ? "#7c3aed" : "var(--dd-text3)",
+                color: done ? "#fff" : active ? "#ac2430" : "var(--dd-text3)",
                 transition: "all 0.2s",
               }}>
                 {done ? (
@@ -446,7 +446,7 @@ function StepIndicator({ step }: { step: 1 | 2 }) {
             {i < steps.length - 1 && (
               <div style={{
                 flex: 1, height: "1px", margin: "0 12px",
-                background: done ? "rgba(124,58,237,0.5)" : "var(--dd-border)",
+                background: done ? "rgba(172,36,48,0.5)" : "var(--dd-border)",
                 transition: "background 0.2s",
               }} />
             )}
@@ -659,8 +659,14 @@ export default function AddCollegePage() {
         <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, overflow: "hidden" }}>
           <button onClick={() => router.push("/about")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Darkdoctor" draggable={false}
-              style={{ height: "28px", width: "auto", objectFit: "contain" }} />
+            <span style={{ display: "inline-flex" }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" className="dd-logo-light" alt="Darkdoctor" draggable={false}
+              style={{ height: "46px", width: "auto", objectFit: "contain" }} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo-dark.png" className="dd-logo-dark" alt="Darkdoctor" draggable={false}
+              style={{ height: "46px", width: "auto", objectFit: "contain" }} />
+            </span>
           </button>
           <span style={{ color: "var(--dd-border2)" }}>/</span>
           <button onClick={() => router.push("/superadmin/home")} style={{
@@ -797,10 +803,10 @@ export default function AddCollegePage() {
                 {/* Continue button */}
                 <button type="submit" style={{
                   padding: "13px", borderRadius: "12px",
-                  background: "linear-gradient(135deg,#7c3aed 0%,#0d9488 100%)",
+                  background: "linear-gradient(135deg,#ac2430 0%,#0d9488 100%)",
                   border: "none", color: "white",
                   fontSize: "0.9375rem", fontWeight: 600, cursor: "pointer",
-                  boxShadow: "0 4px 24px rgba(124,58,237,0.35)",
+                  boxShadow: "0 4px 24px rgba(172,36,48,0.35)",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
                 }}
                   onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.88"; }}
@@ -821,10 +827,10 @@ export default function AddCollegePage() {
                 {/* Summary of step 1 choices */}
                 <div style={{
                   padding: "12px 14px", borderRadius: "12px",
-                  background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.15)",
+                  background: "rgba(172,36,48,0.06)", border: "1px solid rgba(172,36,48,0.15)",
                   display: "flex", flexDirection: "column", gap: "4px",
                 }}>
-                  <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#7c3aed" }}>{form.name}</span>
+                  <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#ac2430" }}>{form.name}</span>
                   <span style={{ fontSize: "0.78rem", color: "var(--dd-text3)" }}>
                     {form.state && `${form.state} · `}
                     {form.college_type === "govt" ? "Government" : "Private"}
@@ -917,11 +923,11 @@ export default function AddCollegePage() {
 
                   <button type="submit" disabled={submitting} style={{
                     padding: "13px", borderRadius: "12px",
-                    background: submitting ? "rgba(124,58,237,0.35)" : "linear-gradient(135deg,#7c3aed 0%,#0d9488 100%)",
+                    background: submitting ? "rgba(172,36,48,0.35)" : "linear-gradient(135deg,#ac2430 0%,#0d9488 100%)",
                     border: "none", color: "white",
                     fontSize: "0.9375rem", fontWeight: 600,
                     cursor: submitting ? "not-allowed" : "pointer",
-                    boxShadow: submitting ? "none" : "0 4px 24px rgba(124,58,237,0.35)",
+                    boxShadow: submitting ? "none" : "0 4px 24px rgba(172,36,48,0.35)",
                     transition: "opacity 0.2s",
                     display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
                     opacity: submitting ? 0.65 : 1,
@@ -972,10 +978,10 @@ export default function AddCollegePage() {
                 <button onClick={() => router.push("/colleges")} style={{
                   display: "inline-flex", alignItems: "center", gap: "3px",
                   background: "none", border: "none", cursor: "pointer",
-                  color: "#7c3aed", fontSize: "0.8125rem", fontWeight: 500, padding: 0,
+                  color: "#ac2430", fontSize: "0.8125rem", fontWeight: 500, padding: 0,
                 }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = "#9161f0"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = "#7c3aed"; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = "#c9424e"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = "#ac2430"; }}
                 >
                   View all
                   <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 4l4 4-4 4"/></svg>
@@ -1015,7 +1021,7 @@ export default function AddCollegePage() {
                           onClick={() => router.push(`/colleges/${c.id}`)}
                           style={{
                             padding: "13px 22px", cursor: "pointer",
-                            background: isFlash ? "rgba(124,58,237,0.09)" : "transparent",
+                            background: isFlash ? "rgba(172,36,48,0.09)" : "transparent",
                             transition: "background 0.5s",
                           }}
                           onMouseEnter={(e) => { if (!isFlash) e.currentTarget.style.background = "var(--dd-surface2)"; }}
@@ -1027,15 +1033,15 @@ export default function AddCollegePage() {
                                 {isFlash && (
                                   <span style={{
                                     fontSize: "0.6875rem", padding: "1px 7px", borderRadius: "20px",
-                                    background: "rgba(124,58,237,0.18)", border: "1px solid rgba(124,58,237,0.35)",
-                                    color: "#7c3aed", fontWeight: 600, letterSpacing: "0.02em",
+                                    background: "rgba(172,36,48,0.18)", border: "1px solid rgba(172,36,48,0.35)",
+                                    color: "#ac2430", fontWeight: 600, letterSpacing: "0.02em",
                                   }}>NEW</span>
                                 )}
                                 <span style={{
                                   fontSize: "0.6875rem", padding: "1px 7px", borderRadius: "20px", fontWeight: 500,
-                                  background: isGovt ? "var(--dd-teal-bg)" : "rgba(124,58,237,0.1)",
-                                  border: `1px solid ${isGovt ? "var(--dd-teal-border)" : "rgba(124,58,237,0.2)"}`,
-                                  color: isGovt ? "var(--dd-teal)" : "#7c3aed",
+                                  background: isGovt ? "var(--dd-teal-bg)" : "rgba(172,36,48,0.1)",
+                                  border: `1px solid ${isGovt ? "var(--dd-teal-border)" : "rgba(172,36,48,0.2)"}`,
+                                  color: isGovt ? "var(--dd-teal)" : "#ac2430",
                                 }}>
                                   {isGovt ? "Govt" : "Private"}
                                 </span>

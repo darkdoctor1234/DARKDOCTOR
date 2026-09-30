@@ -178,8 +178,8 @@ export default function CollegeDetailPage() {
   }
 
   const isGovt      = college?.college_type === "govt";
-  const accentColor = isGovt ? "#0d9488" : "#7c3aed";
-  const accentGlow  = isGovt ? "rgba(13,148,136,0.2)" : "rgba(124,58,237,0.2)";
+  const accentColor = isGovt ? "#0d9488" : "#ac2430";
+  const accentGlow  = isGovt ? "rgba(13,148,136,0.2)" : "rgba(172,36,48,0.2)";
 
   const seatEntries = college?.seat_entries ?? [];
   const seatBadge   = seatEntries.length > 0 ? `${seatEntries.length} program${seatEntries.length !== 1 ? "s" : ""} · tap for breakdown` : superAdmin ? "tap to add breakdown" : undefined;
@@ -267,32 +267,34 @@ export default function CollegeDetailPage() {
                 <h1 style={{ fontSize: "clamp(1.5rem, 4vw, 2.25rem)", fontWeight: 700, letterSpacing: "-0.04em", color: "var(--dd-text1)", marginBottom: "10px", lineHeight: 1.2 }}>
                   {college.name}
                 </h1>
-                <a
-                  href={college.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(college.name + (college.state ? `, ${college.state}` : ""))}`}
-                  target="_blank" rel="noopener noreferrer"
-                  style={{ display: "inline-flex", alignItems: "center", gap: "5px", color: "var(--dd-text2)", fontSize: "0.9375rem", textDecoration: "none", transition: "color 0.15s", width: "fit-content" }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = "#0d9488"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = "var(--dd-text2)"; }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M8 14S3 9.5 3 6a5 5 0 0110 0c0 3.5-5 8-5 8z"/><circle cx="8" cy="6" r="1.5"/></svg>
-                  {college.state || college.location}
-                </a>
                 {college.university && (
-                  <p style={{ marginTop: "8px", fontSize: "0.875rem", color: "var(--dd-text3)", display: "flex", alignItems: "center", gap: "5px" }}>
+                  <p style={{ fontSize: "0.875rem", color: "var(--dd-text3)", display: "flex", alignItems: "center", gap: "5px" }}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
                     {college.university}
                   </p>
                 )}
-                {college.website_url && (
-                  <a href={college.website_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
-                    style={{ marginTop: "10px", display: "inline-flex", alignItems: "center", gap: "5px", padding: "6px 14px", borderRadius: "8px", background: "rgba(13,148,136,0.08)", border: "1px solid rgba(13,148,136,0.22)", color: "#0d9488", fontSize: "0.8125rem", fontWeight: 500, textDecoration: "none", transition: "background 0.15s", width: "fit-content" }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(13,148,136,0.16)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(13,148,136,0.08)"; }}
+                <div style={{ marginTop: "14px", display: "flex", flexWrap: "wrap", gap: "10px" }}>
+                  <a
+                    href={college.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(college.name + (college.state ? `, ${college.state}` : ""))}`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{ display: "inline-flex", alignItems: "center", gap: "5px", padding: "6px 14px", borderRadius: "8px", background: "var(--dd-surface2)", border: "1px solid var(--dd-border2)", color: "var(--dd-text2)", fontSize: "0.8125rem", fontWeight: 500, textDecoration: "none", transition: "background 0.15s", width: "fit-content" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "var(--dd-border)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "var(--dd-surface2)"; }}
                   >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg>
-                    Visit official website
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M8 14S3 9.5 3 6a5 5 0 0110 0c0 3.5-5 8-5 8z"/><circle cx="8" cy="6" r="1.5"/></svg>
+                    {college.state || college.location}
                   </a>
-                )}
+                  {college.website_url && (
+                    <a href={college.website_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                      style={{ display: "inline-flex", alignItems: "center", gap: "5px", padding: "6px 14px", borderRadius: "8px", background: "rgba(13,148,136,0.08)", border: "1px solid rgba(13,148,136,0.22)", color: "#0d9488", fontSize: "0.8125rem", fontWeight: 500, textDecoration: "none", transition: "background 0.15s", width: "fit-content" }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(13,148,136,0.16)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(13,148,136,0.08)"; }}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg>
+                      Visit official website
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -372,7 +374,7 @@ export default function CollegeDetailPage() {
                 {user ? (
                   <button
                     onClick={() => { setAskKind("discussion"); setAskOpen(true); }}
-                    style={{ padding: "9px 18px", borderRadius: "10px", background: "linear-gradient(135deg,#7c3aed,#4b49c9)", border: "none", color: "#fff", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer", boxShadow: "0 4px 16px rgba(124,58,237,0.25)" }}
+                    style={{ padding: "9px 18px", borderRadius: "10px", background: "linear-gradient(135deg,#ac2430,#7a1620)", border: "none", color: "#fff", fontSize: "0.875rem", fontWeight: 600, cursor: "pointer", boxShadow: "0 4px 16px rgba(172,36,48,0.25)" }}
                   >
                     Start a Discussion
                   </button>
@@ -452,7 +454,7 @@ export default function CollegeDetailPage() {
                         id="college-department-filter" name="department-filter"
                         value={deptFilter}
                         onChange={(e) => setDeptFilter(e.target.value)}
-                        style={{ appearance: "none", WebkitAppearance: "none", padding: "7px 32px 7px 12px", borderRadius: "10px", background: "var(--dd-input-bg)", border: `1px solid ${deptFilter !== "all" ? "rgba(124,58,237,0.45)" : "var(--dd-border2)"}`, color: deptFilter !== "all" ? "#7c3aed" : "var(--dd-text2)", fontSize: "0.8125rem", fontWeight: 500, cursor: "pointer", outline: "none", minWidth: "160px" }}
+                        style={{ appearance: "none", WebkitAppearance: "none", padding: "7px 32px 7px 12px", borderRadius: "10px", background: "var(--dd-input-bg)", border: `1px solid ${deptFilter !== "all" ? "rgba(172,36,48,0.45)" : "var(--dd-border2)"}`, color: deptFilter !== "all" ? "#ac2430" : "var(--dd-text2)", fontSize: "0.8125rem", fontWeight: 500, cursor: "pointer", outline: "none", minWidth: "160px" }}
                       >
                         <option value="all">All Departments ({reviews.length})</option>
                         {college.departments.map((d) => {

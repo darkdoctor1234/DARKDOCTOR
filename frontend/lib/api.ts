@@ -58,6 +58,7 @@ interface RegisterPayload {
   pg_college?:        number | null;
   pg_department?:     string;
   batch?:             string;
+  year_of_study?:     string;
   phone?:             string;
   address?:           string;
 }

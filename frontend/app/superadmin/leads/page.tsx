@@ -597,8 +597,14 @@ function NavBar({ router }: { router: ReturnType<typeof useRouter> }) {
       <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, overflow: "hidden" }}>
         <button onClick={() => router.push("/about")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Darkdoctor" draggable={false}
-            style={{ height: "28px", width: "auto", objectFit: "contain" }} />
+          <span style={{ display: "inline-flex" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" className="dd-logo-light" alt="Darkdoctor" draggable={false}
+            style={{ height: "46px", width: "auto", objectFit: "contain" }} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-dark.png" className="dd-logo-dark" alt="Darkdoctor" draggable={false}
+            style={{ height: "46px", width: "auto", objectFit: "contain" }} />
+          </span>
         </button>
         <span style={{ color: "var(--dd-border2)" }}>/</span>
         <span style={{ fontSize: "0.875rem", color: "var(--dd-text3)", fontWeight: 500 }}>Home</span>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { College } from "@/lib/collegeApi";
 import { collegeChangeApi, type CollegeField } from "@/lib/collegeChangeApi";
+import { matchesQuery } from "@/lib/search";
 
 interface Props {
   field: CollegeField;
@@ -19,9 +20,7 @@ export default function CollegeChangeRequestModal({ field, fieldLabel, colleges,
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]         = useState("");
 
-  const filtered = query.trim()
-    ? colleges.filter((c) => c.name.toLowerCase().includes(query.toLowerCase()) || (c.state ?? "").toLowerCase().includes(query.toLowerCase()))
-    : colleges;
+  const filtered = colleges.filter((c) => matchesQuery(query, c.name, c.state));
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null;
