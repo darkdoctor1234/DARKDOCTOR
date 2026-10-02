@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { isAuthenticated } from "@/lib/auth";
@@ -71,13 +71,28 @@ export default function CreateMenu() {
   // document.body escapes that.
   useEffect(() => { setMounted(true); }, []);
 
-  function handleTrigger() {
+  // On a slow phone the sheet can take a moment to paint after the first tap,
+  // so people tap the FAB spot again. Once the sheet does appear, that second
+  // tap lands on whatever is now under their thumb — the backdrop (closing the
+  // sheet they just opened) or the sheet's bottom item (launching "Write a
+  // Review" by accident). Ignore sheet/backdrop taps for a short window after
+  // opening so a re-tap is harmless.
+  const openedAt = useRef(0);
+
+  function handleTrigger(e: React.MouseEvent) {
     if (!isAuthenticated()) { router.push("/login"); return; }
     setCheckError("");
+    openedAt.current = e.timeStamp;
     setSheetOpen(true);
   }
 
-  async function handleAction(action: SheetAction) {
+  function handleBackdropTap(e: React.MouseEvent) {
+    if (e.timeStamp - openedAt.current < 500) return;
+    setSheetOpen(false);
+  }
+
+  async function handleAction(action: SheetAction, tappedAt: number) {
+    if (tappedAt - openedAt.current < 500) return;
     if (action === "ask")     { setSheetOpen(false); setAskState({ kind: "question" }); return; }
     if (action === "discuss") { setSheetOpen(false); setAskState({ kind: "discussion" }); return; }
 
@@ -134,6 +149,49 @@ export default function CreateMenu() {
         New
       </button>
 
+      {/* Rendered outside the portal on purpose: this stylesheet is what hides
+          the desktop button on mobile, so it has to exist from first paint —
+          inside the portal (client-only, post-hydration) a phone briefly
+          showed the desktop "+ New" button until hydration finished. */}
+      <style>{`
+        .dd-create-desktop-btn {
+          display: flex;
+        }
+        .dd-create-fab {
+          display: none;
+          position: fixed; left: 50%; z-index: 60;
+          bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+          transform: translateX(-50%);
+          transition: transform 0.12s ease;
+          touch-action: manipulation;
+          -webkit-tap-highlight-color: transparent;
+        }
+        /* Instant, unmistakable press feedback so a tap never feels ignored. */
+        .dd-create-fab:active { transform: translateX(-50%) scale(0.9); }
+        /* Forgiving hit area — thumbs rarely land dead-centre on a 56px target. */
+        .dd-create-fab::before { content: ""; position: absolute; inset: -10px; border-radius: 50%; }
+        .dd-create-backdrop { align-items: center; }
+        /* Blurring everything behind the sheet is costly to paint on weaker
+           phones, so it's desktop-only; mobile gets the plain dim. */
+        @media (min-width: 768px) {
+          .dd-create-backdrop { backdrop-filter: blur(3px); }
+        }
+        .dd-create-sheet { border-radius: 22px; animation: dd-sheet-in-desktop 0.18s ease; }
+        @keyframes dd-sheet-in-desktop { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+        @keyframes dd-sheet-in-mobile { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: translateY(0); } }
+        @media (max-width: 767px) {
+          .dd-create-desktop-btn { display: none; }
+          .dd-create-fab { display: flex; }
+          .dd-create-backdrop { align-items: flex-end; }
+          .dd-create-sheet {
+            max-width: 100%;
+            border-radius: 22px 22px 0 0;
+            padding-bottom: calc(20px + env(safe-area-inset-bottom, 4px));
+            animation: dd-sheet-in-mobile 0.2s cubic-bezier(0.22,1,0.36,1);
+          }
+        }
+      `}</style>
+
       {mounted && createPortal(
         <>
       {/* ── Mobile FAB — raised center of the bottom tab bar. display/position/
@@ -159,8 +217,8 @@ export default function CreateMenu() {
       {sheetOpen && (
         <div
           className="dd-create-backdrop"
-          onClick={() => setSheetOpen(false)}
-          style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(15,23,42,0.45)", backdropFilter: "blur(3px)", display: "flex", justifyContent: "center" }}
+          onClick={handleBackdropTap}
+          style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(15,23,42,0.45)", display: "flex", justifyContent: "center" }}
         >
           <div
             className="dd-create-sheet"
@@ -183,7 +241,7 @@ export default function CreateMenu() {
               {ACTIONS.map((a) => (
                 <button
                   key={a.id}
-                  onClick={() => handleAction(a.id)}
+                  onClick={(e) => handleAction(a.id, e.timeStamp)}
                   disabled={checking}
                   style={{
                     display: "flex", alignItems: "center", gap: "14px", textAlign: "left",
@@ -229,32 +287,6 @@ export default function CreateMenu() {
         />
       )}
 
-      <style>{`
-        .dd-create-desktop-btn {
-          display: flex;
-        }
-        .dd-create-fab {
-          display: none;
-          position: fixed; left: 50%; z-index: 60;
-          bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-          transform: translateX(-50%);
-        }
-        .dd-create-backdrop { align-items: center; }
-        .dd-create-sheet { border-radius: 22px; animation: dd-sheet-in-desktop 0.18s ease; }
-        @keyframes dd-sheet-in-desktop { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
-        @keyframes dd-sheet-in-mobile { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: translateY(0); } }
-        @media (max-width: 767px) {
-          .dd-create-desktop-btn { display: none; }
-          .dd-create-fab { display: flex; }
-          .dd-create-backdrop { align-items: flex-end; }
-          .dd-create-sheet {
-            max-width: 100%;
-            border-radius: 22px 22px 0 0;
-            padding-bottom: calc(20px + env(safe-area-inset-bottom, 4px));
-            animation: dd-sheet-in-mobile 0.2s cubic-bezier(0.22,1,0.36,1);
-          }
-        }
-      `}</style>
         </>,
         document.body
       )}
