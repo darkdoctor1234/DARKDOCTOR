@@ -5,6 +5,15 @@ from rest_framework.test import APIClient
 from rest_framework import status
 
 from modules.accounts.models import User
+from modules.colleges.models import College
+
+
+def make_college(name="Test Medical College"):
+    return College.objects.create(
+        name=name, intake_seats=100, established_year=2000,
+        location="Testville", college_type=College.CollegeType.GOVT,
+        is_ug=True, has_mbbs=True,
+    )
 
 
 def mark_email_verified(email: str) -> None:
@@ -24,11 +33,19 @@ class RegistrationTests(TestCase):
         cache.clear()
         self.client = APIClient()
         self.url = "/api/v1/auth/register/"
+        self.college = make_college()
         self.valid_payload = {
             "full_name": "Asha Rao",
             "username": "asha_rao",
             "email": "asha@example.com",
             "password": "Correcthorse1!",
+            # Status + the relevant college(s) are required at signup — see
+            # RegisterSerializer.validate(). "ug_aspirant" is the lightest
+            # valid status (no batch/highest_education/pg_department needed
+            # on top), so it's the default here; tests that care about a
+            # specific status override these explicitly.
+            "current_status": "ug_aspirant",
+            "ug_college": self.college.id,
         }
         mark_email_verified(self.valid_payload["email"])
 
@@ -118,6 +135,63 @@ class RegistrationTests(TestCase):
         self.assertIn("email", response.data)
         self.assertFalse(User.objects.filter(email="never-verified@example.com").exists())
 
+    def test_register_requires_a_current_status(self):
+        payload = {k: v for k, v in self.valid_payload.items() if k not in ("current_status", "ug_college")}
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("current_status", response.data)
+
+    def test_register_rejects_other_as_a_status(self):
+        """"other" is a real enum value but was never offered as a signup
+        choice (the frontend filters it out) — must not be usable to dodge
+        the status/college requirement via a direct API call."""
+        payload = {**self.valid_payload, "current_status": "other"}
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("current_status", response.data)
+
+    def test_register_requires_ug_college_for_ug_aspirant(self):
+        payload = {k: v for k, v in self.valid_payload.items() if k != "ug_college"}
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("ug_college", response.data)
+
+    def test_register_requires_pg_college_for_pg_student(self):
+        payload = {**self.valid_payload, "current_status": "pg_student", "batch": "2018", "pg_batch": "2022", "pg_department": "Cardiology"}
+        # pg_college deliberately omitted
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("pg_college", response.data)
+
+    def test_register_requires_pg_department_for_pg_student(self):
+        payload = {
+            **self.valid_payload, "current_status": "pg_student", "batch": "2018", "pg_batch": "2022",
+            "pg_college": make_college("PG Test College").id,
+            # pg_department deliberately omitted
+        }
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("pg_department", response.data)
+
+    def test_register_does_not_require_pg_department_for_pg_aspirant(self):
+        """pg_aspirant hasn't started PG yet, so there's no specialty to
+        report — only actual PG students/graduates/faculty need one."""
+        payload = {
+            **self.valid_payload, "current_status": "pg_aspirant", "batch": "2023",
+            "pg_college": make_college("Aspirant Target College").id,
+        }
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_register_succeeds_for_working_professional_with_full_pg_details(self):
+        payload = {
+            **self.valid_payload, "current_status": "working_professional", "highest_education": "pg",
+            "batch": "2012", "pg_batch": "2016", "pg_department": "Cardiology",
+            "pg_college": make_college("Working Professional PG College").id,
+        }
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
 
 class SignupOtpGateTests(TestCase):
     """SendSignupOtpView / VerifySignupOtpView — the pre-signup email
@@ -173,6 +247,7 @@ class SignupOtpGateTests(TestCase):
         register_response = self.client.post(self.register_url, {
             "full_name": "New Student", "username": "new_student_99",
             "email": self.email, "password": "Xk7$mQp2vLwN9z",
+            "current_status": "ug_aspirant", "ug_college": make_college("OTP Flow College").id,
         }, format="json")
         self.assertEqual(register_response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(User.objects.get(email=self.email).email_verified)
