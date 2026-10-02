@@ -95,13 +95,54 @@ class RegisterSerializer(serializers.Serializer):
         if email and not cache.get(_signup_verified_key(email)):
             raise serializers.ValidationError({"email": "Please verify your email before creating an account."})
 
+        # Status, the relevant college(s), and (where it matters for
+        # Community eligibility) PG specialty are all required at signup —
+        # an account with none of this set can't get a personalised feed,
+        # can't review anything (affiliation-gated), and can't join
+        # Communities, so it's a dead end most people never circle back to
+        # fix in Settings. Mirrors app/signup/page.tsx's goToStep3() exactly
+        # — keep both in sync if this logic ever changes.
+        status = attrs.get("current_status", "")
+        highest_education = attrs.get("highest_education", "")
+        ug_college = attrs.get("ug_college")
+        pg_college = attrs.get("pg_college")
+        pg_department = attrs.get("pg_department", "")
+
+        needs_edu_statuses = (
+            UserProfile.Status.WORKING_PROFESSIONAL,
+            UserProfile.Status.ALUMNI,
+            UserProfile.Status.FACULTY,
+        )
+        if not status or status == UserProfile.Status.OTHER:
+            # "other" is a valid enum value but was never offered as a
+            # signup choice (the frontend filters it out) — reject it here
+            # too so a direct API call can't use it to dodge this gate.
+            raise serializers.ValidationError({"current_status": "Please select your current status."})
+        if status in needs_edu_statuses and not highest_education:
+            raise serializers.ValidationError({"highest_education": "Please select your highest education level."})
+
+        if status in (UserProfile.Status.UG_ASPIRANT, UserProfile.Status.UG_STUDENT):
+            show_ug, show_pg = True, False
+        elif status in (UserProfile.Status.PG_ASPIRANT, UserProfile.Status.PG_STUDENT):
+            show_ug, show_pg = True, True
+        elif status in needs_edu_statuses:
+            show_ug, show_pg = True, highest_education == UserProfile.Education.PG
+        else:
+            show_ug, show_pg = False, False
+
+        if show_ug and not ug_college:
+            raise serializers.ValidationError({"ug_college": "Please select your UG college."})
+        if show_pg and not pg_college:
+            raise serializers.ValidationError({"pg_college": "Please select your PG college."})
+
+        show_pg_dept = show_pg and status != UserProfile.Status.PG_ASPIRANT
+        if show_pg_dept and not pg_department.strip():
+            raise serializers.ValidationError({"pg_department": "Please select your PG specialty."})
+
         # `batch` (UG year) / `pg_batch` (PG year) each mean "year joined"
         # while still pursuing that level, or "year completed" once it's
         # finished — see their help_text on the UserProfile model. Kept in
         # sync with UserProfileSerializer.validate (modules/accounts/serializers.py).
-        status = attrs.get("current_status", "")
-        highest_education = attrs.get("highest_education", "")
-
         requires_batch = status in (
             UserProfile.Status.UG_STUDENT,
             UserProfile.Status.PG_ASPIRANT,

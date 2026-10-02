@@ -288,8 +288,24 @@ export default function SignupPage() {
 
   function goToStep3() {
     setError("");
-    if (status && needsEdu && !highestEdu) {
+    if (!status) {
+      setError("Please select your current status.");
+      return;
+    }
+    if (needsEdu && !highestEdu) {
       setError("Please select your highest education level.");
+      return;
+    }
+    if (showUg && !ugCollege) {
+      setError(`Please select your ${(UG_LABEL[status] || "UG college").toLowerCase()}.`);
+      return;
+    }
+    if (showPg && !pgCollege) {
+      setError("Please select your PG college.");
+      return;
+    }
+    if (showPgDept && !pgDepartment) {
+      setError("Please select your PG specialty — Communities use this to connect you with doctors in your field.");
       return;
     }
     if (needsBatch && !batch.trim()) {
@@ -552,7 +568,7 @@ export default function SignupPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
 
               <div>
-                <Label>Current Status <span style={{ fontWeight: 400, color: "var(--dd-text3)", textTransform: "none", letterSpacing: 0 }}>(optional)</span></Label>
+                <Label>Current Status <span style={{ color: "#0d9488" }}>*</span></Label>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                   {STATUS_OPTIONS.filter((opt) => opt.value !== "other").map((opt) => {
                     const active = status === opt.value;
@@ -601,19 +617,19 @@ export default function SignupPage() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "14px", paddingTop: "14px", borderTop: "1px solid var(--dd-border)" }}>
                   {showUg && (
                     <div>
-                      <Label>{UG_LABEL[status] || "UG College"}</Label>
+                      <Label>{UG_LABEL[status] || "UG College"} <span style={{ color: "#0d9488" }}>*</span></Label>
                       <CollegeSelect colleges={ugColleges} value={ugCollege} onChange={setUgCollege} placeholder="Select UG college…" />
                     </div>
                   )}
                   {showPg && (
                     <div>
-                      <Label>{status === "pg_aspirant" ? "Target College (PG)" : status === "pg_student" ? "Current PG College" : "PG College Attended"}</Label>
+                      <Label>{status === "pg_aspirant" ? "Target College (PG)" : status === "pg_student" ? "Current PG College" : "PG College Attended"} <span style={{ color: "#0d9488" }}>*</span></Label>
                       <CollegeSelect colleges={pgColleges} value={pgCollege} onChange={setPgCollege} placeholder="Select PG college…" />
                     </div>
                   )}
                   {showPgDept && (
                     <div>
-                      <Label>PG Specialty <span style={{ fontWeight: 400, color: "var(--dd-text4)" }}>(optional, can add later)</span></Label>
+                      <Label>PG Specialty <span style={{ color: "#0d9488" }}>*</span> <span style={{ fontWeight: 400, color: "var(--dd-text4)" }}>(connects you to your Specialty Community)</span></Label>
                       <div style={{ position: "relative" }}>
                         <select
                           id="signup-pg-department" name="pg_department"
