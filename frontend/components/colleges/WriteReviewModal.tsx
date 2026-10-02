@@ -185,6 +185,24 @@ function deriveRole(status: string): ReviewerRole | null {
   return null;
 }
 
+/** `batch` is always the UG year and `pg_batch` the PG year, so a review's
+ *  year/role must follow whichever college is actually being reviewed — not
+ *  just blindly use the UG year. Where the same college is both the UG and PG
+ *  college, the PG affiliation (the more recent one) wins. A PG student
+ *  reviewing their UG college has finished there, so they review as alumni. */
+function deriveAffiliation(
+  p: { current_status: string; ug_college: number | null; pg_college: number | null; batch: string; pg_batch: string },
+  collegeId: number,
+): { role: ReviewerRole | null; batchYear: string } {
+  const isPg = p.current_status !== "pg_aspirant" && p.pg_college === collegeId;
+  if (isPg) return { role: deriveRole(p.current_status), batchYear: p.pg_batch || "" };
+
+  const role = p.current_status === "pg_student" && p.ug_college === collegeId
+    ? "alumni"
+    : deriveRole(p.current_status);
+  return { role, batchYear: p.batch || "" };
+}
+
 export default function WriteReviewModal({ collegeId, collegeName, onClose, onSubmitted }: Props) {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [role,           setRole]           = useState<ReviewerRole | null>(null);
@@ -219,8 +237,9 @@ export default function WriteReviewModal({ collegeId, collegeName, onClose, onSu
       collegeApi.myReviews().catch(() => []),
     ])
       .then(([p, myReviews]) => {
-        setRole(deriveRole(p.current_status));
-        setBatchYear(p.batch || "");
+        const affiliation = deriveAffiliation(p, collegeId);
+        setRole(affiliation.role);
+        setBatchYear(affiliation.batchYear);
 
         const existing = myReviews.find((r) => r.college === collegeId) ?? null;
         setExistingReview(existing);
