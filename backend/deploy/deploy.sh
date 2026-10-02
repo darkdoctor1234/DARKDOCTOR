@@ -36,6 +36,10 @@ done
 echo "==> Applying migrations (no-op if there are none)"
 docker compose exec -T app python manage.py migrate
 
+echo "==> Restarting nginx (it resolves the app container's IP once at startup,"
+echo "    and 'docker compose up' above recreated app with a new IP)"
+docker compose restart nginx
+
 echo "==> Verifying the deployed instance is actually healthy"
 if ! curl -sf http://localhost/health/ >/dev/null; then
   echo "Deploy finished but /health/ isn't returning healthy — check 'docker compose logs app' and 'docker compose logs nginx'." >&2
