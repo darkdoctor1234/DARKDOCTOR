@@ -110,7 +110,6 @@ export default function SignupPage() {
   // "awaiting" (code sent, box shown), "verified" (locked in, can proceed).
   const [otpPhase,     setOtpPhase]     = useState<"form" | "awaiting" | "verified">("form");
   const [otpCode,      setOtpCode]      = useState("");
-  const [otpSending,   setOtpSending]   = useState(false);
   const [otpVerifying, setOtpVerifying] = useState(false);
   const [otpError,     setOtpError]     = useState("");
   const [otpShakeToken, setOtpShakeToken] = useState(0);
