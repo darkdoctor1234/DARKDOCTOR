@@ -33,39 +33,51 @@ function pickError(data: Record<string, unknown>): string {
 async function handleResponse<T>(res: Response): Promise<T> {
   if (res.status === 204) return undefined as T;
   const data = await res.json();
-
-  if (res.status === 401) {
-    const { clearSession } = await import("./auth");
-    clearSession();
-    if (typeof window !== "undefined") window.location.replace("/");
-    throw new Error("Session expired. Please log in again.");
-  }
   if (!res.ok) throw new Error(pickError(data as Record<string, unknown>));
   return data as T;
 }
 
+/** Runs `makeRequest` with the current access token; on 401, tries one
+ * silent refresh and retries once before giving up and logging out. */
+async function withAuthRetry(makeRequest: (token: string | null) => Promise<Response>): Promise<Response> {
+  let res = await makeRequest(getAccessToken());
+  if (res.status === 401) {
+    const { refreshAccessToken, clearSession } = await import("./auth");
+    const newToken = await refreshAccessToken();
+    if (newToken) res = await makeRequest(newToken);
+    if (res.status === 401) {
+      clearSession();
+      if (typeof window !== "undefined") window.location.replace("/");
+      throw new Error("Session expired. Please log in again.");
+    }
+  }
+  return res;
+}
+
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = getAccessToken();
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(`${BASE_URL}${path}`, {
-    ...options,
-    headers: { ...headers, ...(options.headers as Record<string, string> | undefined) },
+  const res = await withAuthRetry((token) => {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    return fetch(`${BASE_URL}${path}`, {
+      ...options,
+      headers: { ...headers, ...(options.headers as Record<string, string> | undefined) },
+    });
   });
   return handleResponse<T>(res);
 }
 
 export const collegeChangeApi = {
   submit: async (field: CollegeField, collegeId: number, proof: File): Promise<CollegeChangeRequestItem> => {
-    const token = getAccessToken();
-    const form = new FormData();
-    form.append("field", field);
-    form.append("requested_college", String(collegeId));
-    form.append("proof", proof);
-    const res = await fetch(`${BASE_URL}/accounts/college-change-requests/`, {
-      method: "POST",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: form,
+    const res = await withAuthRetry((token) => {
+      const form = new FormData();
+      form.append("field", field);
+      form.append("requested_college", String(collegeId));
+      form.append("proof", proof);
+      return fetch(`${BASE_URL}/accounts/college-change-requests/`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form,
+      });
     });
     return handleResponse<CollegeChangeRequestItem>(res);
   },

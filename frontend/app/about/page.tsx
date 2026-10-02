@@ -203,13 +203,7 @@ export default function AboutPage() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <span style={{ display: "inline-flex" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" className="dd-logo-light"
-          alt="Darkdoctor"
-          draggable={false}
-          style={{ height: "24px", width: "auto", objectFit: "contain", opacity: 0.85 }}
-        />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-dark.png" className="dd-logo-dark"
+          <img src="/logo.png"
           alt="Darkdoctor"
           draggable={false}
           style={{ height: "24px", width: "auto", objectFit: "contain", opacity: 0.85 }}

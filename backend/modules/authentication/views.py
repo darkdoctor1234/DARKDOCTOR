@@ -2,6 +2,8 @@ import secrets
 import hashlib
 from django.conf import settings
 from django.core.cache import cache
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import validate_email as django_validate_email
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
@@ -133,7 +135,14 @@ class UserLoginView(APIView):
 
 
 class RegisterView(APIView):
-    """Public registration — creates a new end user and returns tokens (auto-login)."""
+    """Public registration — creates a new end user and returns tokens (auto-login).
+
+    Email verification now happens *before* this (see SendSignupOtpView /
+    VerifySignupOtpView below) — RegisterSerializer.validate() refuses to
+    create an account unless the submitted email already cleared that gate,
+    so every account created here starts out with email_verified already
+    True. No post-registration "verify later" email is sent anymore.
+    """
     permission_classes = [permissions.AllowAny]
     throttle_classes = [AuthRateThrottle]
 
@@ -143,15 +152,104 @@ class RegisterView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         user = serializer.save()
         tokens = get_tokens_for_user(user)
-        try:
-            _send_new_verification_code(user)
-        except Exception:
-            pass  # best-effort — never block registration on an email hiccup
         return Response({
             "access":  tokens["access"],
             "refresh": tokens["refresh"],
             "user": build_user_payload(user),
         }, status=status.HTTP_201_CREATED)
+
+
+_SIGNUP_OTP_TTL       = 900   # 15 minutes — matches every other OTP in this file
+_SIGNUP_VERIFIED_TTL  = 1800  # 30 minutes — enough to finish steps 2 & 3 of the wizard after verifying
+_SIGNUP_COOLDOWN      = 45    # seconds between resend requests, matches _VERIFY_COOLDOWN
+
+
+def _signup_otp_key(email: str) -> str:
+    return f"signup_otp_{hashlib.sha256(email.encode()).hexdigest()}"
+
+
+def _signup_cooldown_key(email: str) -> str:
+    return f"signup_otp_cooldown_{hashlib.sha256(email.encode()).hexdigest()}"
+
+
+def _signup_verified_key(email: str) -> str:
+    """Set once VerifySignupOtpView accepts the right code for this email —
+    RegisterSerializer.validate() checks this and refuses to create an
+    account without it. Keyed by email (not a user id, since none exists
+    yet), so changing the email after verifying silently invalidates it —
+    the new email's key was never set — forcing a fresh verification."""
+    return f"signup_verified_{hashlib.sha256(email.encode()).hexdigest()}"
+
+
+class SendSignupOtpView(APIView):
+    """
+    POST /api/v1/auth/signup/send-otp/
+    Body: { "email": "..." }
+    Sends a 6-digit code to an email that isn't registered yet, as the
+    first step of account creation — see VerifySignupOtpView and
+    RegisterSerializer.validate() for the rest of the gate.
+    """
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
+
+    def post(self, request):
+        email = request.data.get("email", "").strip().lower()
+        if not email:
+            return Response({"detail": "Email is required."}, status=400)
+        try:
+            django_validate_email(email)
+        except DjangoValidationError:
+            # Unlike RegisterSerializer (a real EmailField), this view reads
+            # the raw request body — without this, a malformed address
+            # would "successfully" get an OTP generated and silently fail
+            # to ever deliver at the SMTP layer, dead-ending signup with no
+            # visible error.
+            return Response({"detail": "Please enter a valid email address."}, status=400)
+
+        if User.objects.filter(email__iexact=email).exists():
+            # Same disclosure EmailCheckView already makes publicly — not a
+            # new enumeration surface.
+            return Response({"detail": "An account with this email already exists."}, status=400)
+
+        if cache.get(_signup_cooldown_key(email)):
+            return Response({"detail": "Please wait a moment before requesting another code."}, status=429)
+
+        otp = str(secrets.randbelow(900000) + 100000)
+        cache.set(_signup_otp_key(email), otp, timeout=_SIGNUP_OTP_TTL)
+        cache.set(_signup_cooldown_key(email), True, timeout=_SIGNUP_COOLDOWN)
+        # A re-send implicitly un-verifies — the old code (and any prior
+        # verified flag tied to it) must not still work after this point.
+        cache.delete(_signup_verified_key(email))
+        send_verification_email(email, otp)
+
+        response = {"detail": "Verification code sent."}
+        if not settings.EMAIL_HOST:
+            response["dev_otp"] = otp
+        return Response(response)
+
+
+class VerifySignupOtpView(APIView):
+    """
+    POST /api/v1/auth/signup/verify-otp/
+    Body: { "email": "...", "otp": "123456" }
+    """
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [AuthRateThrottle]
+
+    def post(self, request):
+        email = request.data.get("email", "").strip().lower()
+        otp   = str(request.data.get("otp", "")).strip()
+        if not email or not otp:
+            return Response({"detail": "Email and code are required."}, status=400)
+
+        stored_otp = cache.get(_signup_otp_key(email))
+        if not stored_otp or stored_otp != otp:
+            return Response({"detail": "Invalid or expired code."}, status=400)
+
+        cache.delete(_signup_otp_key(email))
+        cache.delete(_signup_cooldown_key(email))
+        cache.set(_signup_verified_key(email), True, timeout=_SIGNUP_VERIFIED_TTL)
+        return Response({"detail": "Email verified.", "verified": True})
 
 
 class TokenRefreshView(APIView):
@@ -178,7 +276,7 @@ class ForgotPasswordView(APIView):
             return Response({"detail": "Email is required."}, status=400)
 
         try:
-            user = User.objects.get(email=email, role=User.Role.USER, is_active=True)
+            user = User.objects.get(email__iexact=email, role=User.Role.USER, is_active=True)
         except User.DoesNotExist:
             # Don't reveal whether email exists
             return Response({"detail": "If that email is registered, you will receive a reset code."})
@@ -219,7 +317,7 @@ class ResetPasswordView(APIView):
             return Response({"detail": "Invalid or expired reset code."}, status=400)
 
         try:
-            user = User.objects.get(email=email, role=User.Role.USER, is_active=True)
+            user = User.objects.get(email__iexact=email, role=User.Role.USER, is_active=True)
         except User.DoesNotExist:
             return Response({"detail": "Invalid or expired reset code."}, status=400)
 

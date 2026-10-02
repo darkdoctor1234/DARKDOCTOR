@@ -4,7 +4,6 @@ import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { isAuthenticated, getUser, clearSession, getRefreshToken, getAccessToken } from "@/lib/auth";
 import { authApi } from "@/lib/api";
-import { useTheme } from "@/lib/themeContext";
 import CreateMenu from "@/components/CreateMenu";
 import EmailVerifyModal from "@/components/EmailVerifyModal";
 import NotificationBell from "@/components/NotificationBell";
@@ -117,57 +116,6 @@ function BottomTab({ tab, active, hasUnreadCommunity, onClick }: {
       }}>
         {tab.label}
       </span>
-    </button>
-  );
-}
-
-/* ── Theme toggle button ── */
-function ThemeToggle() {
-  const { theme, toggle } = useTheme();
-  const isDark = theme === "dark";
-  return (
-    <button
-      onClick={toggle}
-      title={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      style={{
-        width: "32px", height: "32px", borderRadius: "8px",
-        background: "var(--dd-surface2)",
-        border: "1px solid var(--dd-border)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        color: "var(--dd-text3)", cursor: "pointer",
-        transition: "color 0.15s, background 0.15s, border-color 0.15s",
-        flexShrink: 0,
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.color = "var(--dd-text1)";
-        e.currentTarget.style.background = "var(--dd-surface)";
-        e.currentTarget.style.borderColor = "var(--dd-border2)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.color = "var(--dd-text3)";
-        e.currentTarget.style.background = "var(--dd-surface2)";
-        e.currentTarget.style.borderColor = "var(--dd-border)";
-      }}
-    >
-      {isDark ? (
-        /* Sun icon — click to go light */
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <circle cx="12" cy="12" r="5"/>
-          <line x1="12" y1="1" x2="12" y2="3"/>
-          <line x1="12" y1="21" x2="12" y2="23"/>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-          <line x1="1" y1="12" x2="3" y2="12"/>
-          <line x1="21" y1="12" x2="23" y2="12"/>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-        </svg>
-      ) : (
-        /* Moon icon — click to go dark */
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
-        </svg>
-      )}
     </button>
   );
 }
@@ -380,10 +328,7 @@ export default function UserShell({ children }: { children: React.ReactNode }) {
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Darkdoctor" draggable={false} className="dd-logo-light"
-              style={{ height: "46px", width: "auto", objectFit: "contain" }} />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-dark.png" alt="Darkdoctor" draggable={false} className="dd-logo-dark"
+            <img src="/logo.png" alt="Darkdoctor" draggable={false}
               style={{ height: "46px", width: "auto", objectFit: "contain" }} />
           </button>
 
@@ -466,9 +411,6 @@ export default function UserShell({ children }: { children: React.ReactNode }) {
 
         {/* ── RIGHT zone ── */}
         <div className="dd-nav-right" style={{ flex: 1, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "10px" }}>
-          {/* Theme toggle — always visible once mounted */}
-          {mounted && <ThemeToggle />}
-
           {mounted && (
             <>
               {user?.role === "super_admin" && (

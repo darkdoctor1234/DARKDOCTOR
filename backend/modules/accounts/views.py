@@ -1,4 +1,5 @@
 import csv
+import logging
 from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
@@ -15,15 +16,21 @@ from .serializers import (
 from modules.authentication.permissions import IsSuperAdmin, IsAdmin
 from modules.notifications.services import notify
 
+logger = logging.getLogger(__name__)
+
 
 def _sync_community_memberships(profile):
     """Best-effort — a Community sync failure should never block saving a
-    profile. See modules.communities.services.sync_memberships."""
+    profile. See modules.communities.services.sync_memberships. Logged (not
+    silently swallowed) so a sync failure is actually visible somewhere —
+    previously this was a bare `except Exception: pass` and a failed sync
+    left an account with 0/partial community memberships with zero trace of
+    why anywhere."""
     try:
         from modules.communities.services import sync_memberships
         sync_memberships(profile)
     except Exception:
-        pass
+        logger.exception("Community membership sync failed for profile id=%s", profile.pk)
 
 
 _COLLEGE_FIELD_LABEL = {"ug_college": "UG college", "pg_college": "PG college"}
@@ -292,6 +299,22 @@ class ProfileMeView(APIView):
             request.user.save(update_fields=user_fields)
 
         return Response(_profile_data(profile, request.user))
+
+    def delete(self, request):
+        """Permanently delete the authenticated user's own account. Scoped to
+        role=USER only — this is the consumer-facing Settings page action,
+        not a path for an admin/super-admin to self-delete their privileged
+        account with no additional safeguard; those go through the dedicated
+        Admin Management flows instead.
+
+        Hard delete — CASCADEs away all of their reviews/Q&A/community content
+        too (see each model's on_delete), matching how AdminDetailView.destroy
+        already deletes an admin's row; no soft-delete/anonymization pattern
+        exists in this codebase to reuse instead."""
+        if request.user.role != User.Role.USER:
+            return Response({"detail": "Admin and super-admin accounts can't be self-deleted here."}, status=403)
+        request.user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 # ── College change requests ─────────────────────────────────────────────────

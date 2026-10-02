@@ -350,7 +350,7 @@ export default function FinanceBreakdownModal({
                                     {group.program}
                                   </span>
                                   <span style={{ fontSize: "0.78rem", color: "var(--dd-text3)" }}>
-                                    {group.rows.length} dept{group.rows.length !== 1 ? "s" : ""}
+                                    {group.rows.length} {isFee ? "dept" : "year"}{group.rows.length !== 1 ? "s" : ""}
                                   </span>
                                 </div>
                                 {/* Department rows (indented) */}

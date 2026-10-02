@@ -57,6 +57,7 @@ export interface UserProfile {
   pg_college_locked?: boolean;
   pg_department:     string;
   batch:             string;
+  pg_batch:          string;
   year_of_study:     YearOfStudyValue;
   phone:             string;
   address:           string;
@@ -106,32 +107,39 @@ export interface ProfilePayload {
   pg_college?:        number | null;
   pg_department?:     string;
   batch?:             string;
+  pg_batch?:          string;
   year_of_study?:     string;
   phone?:             string;
   address?:           string;
 }
 
 /* ── Shared fetch helper ── */
-async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = getAccessToken();
+async function doFetch(path: string, options: RequestInit, token: string | null): Promise<Response> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
-
-  const res = await fetch(`${BASE_URL}${path}`, {
+  return fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: { ...headers, ...(options.headers as Record<string, string> | undefined) },
   });
+}
+
+async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  let res = await doFetch(path, options, getAccessToken());
+
+  /* 401 — try one silent refresh-and-retry before giving up */
+  if (res.status === 401) {
+    const { refreshAccessToken, clearSession } = await import("./auth");
+    const newToken = await refreshAccessToken();
+    if (newToken) res = await doFetch(path, options, newToken);
+    if (res.status === 401) {
+      clearSession();
+      if (typeof window !== "undefined") window.location.replace("/");
+      throw new Error("Session expired. Please log in again.");
+    }
+  }
 
   if (res.status === 204) return undefined as T;
   const data = await res.json();
-
-  /* 401 = token expired — clear session and redirect to login */
-  if (res.status === 401) {
-    const { clearSession } = await import("./auth");
-    clearSession();
-    if (typeof window !== "undefined") window.location.replace("/");
-    throw new Error("Session expired. Please log in again.");
-  }
 
   if (!res.ok) {
     const pick = (d: Record<string, unknown>): string => {
@@ -168,4 +176,9 @@ export const profileApi = {
   /** Public profile by username — no auth required, works for logged-out visitors too. */
   getPublic: (username: string) =>
     apiFetch<PublicProfile>(`/accounts/u/${encodeURIComponent(username)}/`),
+
+  /** Permanently deletes the current user's own account (and, via CASCADE,
+   * all their reviews/Q&A/community content). Irreversible. */
+  deleteAccount: () =>
+    apiFetch<void>("/accounts/profile/me/", { method: "DELETE" }),
 };

@@ -58,6 +58,7 @@ interface RegisterPayload {
   pg_college?:        number | null;
   pg_department?:     string;
   batch?:             string;
+  pg_batch?:          string;
   year_of_study?:     string;
   phone?:             string;
   address?:           string;
@@ -82,16 +83,22 @@ export const authApi = {
   forgotPassword: (email: string) =>
     post<{ detail: string; dev_otp?: string }>("/auth/forgot-password/", { email }),
 
+  sendSignupOtp: (email: string) =>
+    post<{ detail: string; dev_otp?: string }>("/auth/signup/send-otp/", { email }),
+
+  verifySignupOtp: (email: string, otp: string) =>
+    post<{ detail: string; verified: boolean }>("/auth/signup/verify-otp/", { email, otp }),
+
   resetPassword: (email: string, otp: string, new_password: string) =>
     post<{ detail: string }>("/auth/reset-password/", { email, otp, new_password }),
 
   checkUsername: async (username: string): Promise<{ available: boolean; error?: string }> => {
     const res = await fetch(`${BASE_URL}/auth/username-check/?username=${encodeURIComponent(username)}`);
-    return res.json();
-  },
-
-  checkEmail: async (email: string): Promise<{ available: boolean }> => {
-    const res = await fetch(`${BASE_URL}/auth/email-check/?email=${encodeURIComponent(email)}`);
+    // A non-2xx (e.g. throttled, 5xx) has no `available` key — without this
+    // check it reads as `undefined`/falsy and the caller wrongly reports
+    // "username already taken" for what's actually a request that never
+    // got a real answer.
+    if (!res.ok) throw new Error("Couldn't check username right now.");
     return res.json();
   },
 

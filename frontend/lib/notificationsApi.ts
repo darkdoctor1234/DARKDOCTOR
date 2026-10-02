@@ -17,25 +17,31 @@ export interface NotificationList {
   results: Notification[];
 }
 
-async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = getAccessToken();
+async function doFetch(path: string, options: RequestInit, token: string | null): Promise<Response> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
-
-  const res = await fetch(`${BASE_URL}${path}`, {
+  return fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: { ...headers, ...(options.headers as Record<string, string> | undefined) },
   });
+}
+
+async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  let res = await doFetch(path, options, getAccessToken());
+
+  if (res.status === 401) {
+    const { refreshAccessToken, clearSession } = await import("./auth");
+    const newToken = await refreshAccessToken();
+    if (newToken) res = await doFetch(path, options, newToken);
+    if (res.status === 401) {
+      clearSession();
+      if (typeof window !== "undefined") window.location.replace("/");
+      throw new Error("Session expired. Please log in again.");
+    }
+  }
 
   if (res.status === 204) return undefined as T;
   const data = await res.json();
-
-  if (res.status === 401) {
-    const { clearSession } = await import("./auth");
-    clearSession();
-    if (typeof window !== "undefined") window.location.replace("/");
-    throw new Error("Session expired. Please log in again.");
-  }
 
   if (!res.ok) {
     const pick = (d: Record<string, unknown>): string => {

@@ -89,7 +89,7 @@ class ProfileMeViewCollegeLockTests(TestCase):
         self.client.force_authenticate(user=self.user)
 
     def _create_profile(self, **extra):
-        payload = {"current_status": "working_professional", **extra}
+        payload = {"current_status": "working_professional", "batch": "2015", **extra}
         return self.client.post("/api/v1/accounts/profile/me/", payload, format="json")
 
     def test_creating_profile_with_college_sets_lock_timestamp(self):

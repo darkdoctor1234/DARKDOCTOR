@@ -23,6 +23,19 @@ function inr(amount: number): string {
   return "₹" + amount.toLocaleString("en-IN");
 }
 
+/** Groups fee/stipend rows by program, preserving first-seen order — mirrors
+ * FinanceBreakdownModal's own grouping so the main card's headline figure
+ * and the breakdown modal always agree on what counts as "one program". */
+function groupByProgram<T extends { program: string }>(entries: T[]): T[][] {
+  const order: string[] = [];
+  const map = new Map<string, T[]>();
+  for (const e of entries) {
+    if (!map.has(e.program)) { order.push(e.program); map.set(e.program, []); }
+    map.get(e.program)!.push(e);
+  }
+  return order.map((p) => map.get(p)!);
+}
+
 function Chip({ label, color, bg, border }: { label: string; color: string; bg: string; border: string }) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", padding: "4px 12px", borderRadius: "100px", background: bg, border: `1px solid ${border}`, color, fontSize: "0.8125rem", fontWeight: 500, letterSpacing: "0.01em", whiteSpace: "nowrap" }}>
@@ -189,10 +202,25 @@ export default function CollegeDetailPage() {
   const feeValue   = feeTotal > 0 ? inr(feeTotal) : "-";
   const feeBadge   = feeEntries.length > 0 ? `${feeEntries.length} program${feeEntries.length !== 1 ? "s" : ""} · tap for breakdown` : superAdmin ? "tap to add breakdown" : undefined;
 
+  // Grouped by program, same as FinanceBreakdownModal — a program's rows are
+  // often year-wise stipend amounts (1st/2nd/3rd year), not separate programs
+  // whose amounts add up. Summing every row flatly (the old behaviour) gave a
+  // meaningless combined figure (e.g. one PG program's 3 training years added
+  // together). A single program shows as a range across its rows instead;
+  // multiple distinct programs each contribute their highest-year amount.
   const stipendEntries = college?.stipend_entries ?? [];
-  const stipendTotal   = stipendEntries.reduce((s, e) => s + e.amount, 0);
-  const stipendValue   = stipendTotal > 0 ? inr(stipendTotal) : "-";
-  const stipendBadge   = stipendEntries.length > 0 ? `${stipendEntries.length} program${stipendEntries.length !== 1 ? "s" : ""} · tap for breakdown` : superAdmin ? "tap to add breakdown" : undefined;
+  const stipendGroups  = groupByProgram(stipendEntries);
+  const stipendValue   = (() => {
+    if (stipendGroups.length === 0) return "-";
+    if (stipendGroups.length === 1) {
+      const amounts = stipendGroups[0].map((e) => e.amount);
+      const min = Math.min(...amounts), max = Math.max(...amounts);
+      return min === max ? inr(min) : `${inr(min)} – ${inr(max)}`;
+    }
+    const total = stipendGroups.reduce((s, g) => s + Math.max(...g.map((e) => e.amount)), 0);
+    return inr(total);
+  })();
+  const stipendBadge = stipendGroups.length > 0 ? `${stipendGroups.length} program${stipendGroups.length !== 1 ? "s" : ""} · tap for breakdown` : superAdmin ? "tap to add breakdown" : undefined;
 
   // Aggregate rating meters — averaged live from every visible review, not editorial figures
   const RATING_KEYS = ["rating_infrastructure", "rating_clinical", "rating_hostel", "rating_administration", "rating_overall"] as const;
@@ -245,7 +273,17 @@ export default function CollegeDetailPage() {
       </nav>
 
       <main style={{ maxWidth: "900px", margin: "0 auto", padding: "40px 20px 80px" }}>
-        {loading && <div style={{ padding: "80px", textAlign: "center", color: "var(--dd-text3)" }}>Loading college…</div>}
+        {loading && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            <div style={{ height: "150px", borderRadius: "20px", background: "var(--dd-surface2)", animation: "collegeDetailPulse 1.5s ease-in-out infinite" }} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "14px" }}>
+              {[1,2,3,4].map((i) => (
+                <div key={i} style={{ height: "100px", borderRadius: "16px", background: "var(--dd-surface2)", animation: "collegeDetailPulse 1.5s ease-in-out infinite", animationDelay: `${i * 0.1}s` }} />
+              ))}
+            </div>
+            <style>{`@keyframes collegeDetailPulse{0%,100%{opacity:.25}50%{opacity:.55}}`}</style>
+          </div>
+        )}
 
         {!loading && error && (
           <div style={{ padding: "60px", textAlign: "center" }}>
@@ -527,7 +565,7 @@ export default function CollegeDetailPage() {
                   </div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                    {filtered.map((review) => <ReviewCard key={review.id} review={review} onReport={loadReviews} />)}
+                    {filtered.map((review) => <ReviewCard key={review.id} review={review} onReport={loadReviews} showCollege={false} />)}
                   </div>
                 );
               })()}

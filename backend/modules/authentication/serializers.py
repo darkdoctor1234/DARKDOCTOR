@@ -1,8 +1,20 @@
+import hashlib
+import logging
+from django.core.cache import cache
 from django.db import transaction
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from modules.accounts.models import User, UserProfile
 from .password_validation import validate_password_strength
+
+logger = logging.getLogger(__name__)
+
+
+def _signup_verified_key(email: str) -> str:
+    """Kept in sync with the identical helper in views.py (SendSignupOtpView
+    / VerifySignupOtpView) — duplicated rather than imported to avoid a
+    views-importing-serializers-importing-views cycle."""
+    return f"signup_verified_{hashlib.sha256(email.encode()).hexdigest()}"
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -28,6 +40,7 @@ class RegisterSerializer(serializers.Serializer):
     pg_college = serializers.IntegerField(required=False, allow_null=True, default=None)
     pg_department = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
     batch      = serializers.CharField(max_length=20, required=False, allow_blank=True, default="")
+    pg_batch   = serializers.CharField(max_length=20, required=False, allow_blank=True, default="")
     year_of_study = serializers.ChoiceField(
         choices=UserProfile.YearOfStudy.choices, required=False, allow_blank=True, default="",
     )
@@ -72,14 +85,40 @@ class RegisterSerializer(serializers.Serializer):
         return value
 
     def validate(self, attrs):
+        # Email must have cleared the pre-signup OTP gate (see
+        # SendSignupOtpView / VerifySignupOtpView in views.py) before an
+        # account can be created at all — this is the actual enforcement
+        # point; the frontend's "verified" state is just UX, never trusted
+        # on its own. validate_email() above already confirmed the email
+        # isn't taken, so attrs["email"] is the clean, lowercased value.
+        email = attrs.get("email", "")
+        if email and not cache.get(_signup_verified_key(email)):
+            raise serializers.ValidationError({"email": "Please verify your email before creating an account."})
+
+        # `batch` (UG year) / `pg_batch` (PG year) each mean "year joined"
+        # while still pursuing that level, or "year completed" once it's
+        # finished — see their help_text on the UserProfile model. Kept in
+        # sync with UserProfileSerializer.validate (modules/accounts/serializers.py).
         status = attrs.get("current_status", "")
+        highest_education = attrs.get("highest_education", "")
+
         requires_batch = status in (
             UserProfile.Status.UG_STUDENT,
+            UserProfile.Status.PG_ASPIRANT,
             UserProfile.Status.PG_STUDENT,
+            UserProfile.Status.WORKING_PROFESSIONAL,
             UserProfile.Status.ALUMNI,
+            UserProfile.Status.FACULTY,
         )
         if requires_batch and not attrs.get("batch", "").strip():
-            raise serializers.ValidationError({"batch": "Batch year is required for students and alumni."})
+            raise serializers.ValidationError({"batch": "UG year is required for this status."})
+
+        requires_pg_batch = status == UserProfile.Status.PG_STUDENT or (
+            status in (UserProfile.Status.WORKING_PROFESSIONAL, UserProfile.Status.ALUMNI, UserProfile.Status.FACULTY)
+            and highest_education == UserProfile.Education.PG
+        )
+        if requires_pg_batch and not attrs.get("pg_batch", "").strip():
+            raise serializers.ValidationError({"pg_batch": "PG year is required for this status."})
 
         # Object-level (not field-level validate_password) so
         # UserAttributeSimilarityValidator can actually compare the
@@ -102,6 +141,7 @@ class RegisterSerializer(serializers.Serializer):
             "highest_education": validated_data.pop("highest_education", ""),
             "pg_department":     validated_data.pop("pg_department",     ""),
             "batch":             validated_data.pop("batch",             ""),
+            "pg_batch":          validated_data.pop("pg_batch",          ""),
             "year_of_study":     validated_data.pop("year_of_study",     ""),
             "phone":             validated_data.pop("phone",             ""),
             "address":           validated_data.pop("address",           ""),
@@ -116,7 +156,15 @@ class RegisterSerializer(serializers.Serializer):
                 full_name=validated_data["full_name"],
                 username=validated_data.get("username") or None,
                 role=User.Role.USER,
+                # Guaranteed by validate() above — this account could not
+                # have been created without the email already clearing the
+                # pre-signup OTP gate.
+                email_verified=True,
             )
+            # Single-use: consumed the moment it's actually spent on an
+            # account, so it can't be replayed for a second registration
+            # attempt against the same email within its TTL.
+            cache.delete(_signup_verified_key(user.email))
             profile = UserProfile.objects.create(user=user, **profile_data)
 
             # Assign college FKs after profile creation to avoid College import at module level
@@ -139,7 +187,10 @@ class RegisterSerializer(serializers.Serializer):
                 from modules.communities.services import sync_memberships
                 sync_memberships(profile)
             except Exception:
-                pass  # best-effort — never block registration on this
+                # best-effort — never block registration on this, but log it
+                # so a sync failure isn't completely invisible (previously a
+                # bare `except Exception: pass`).
+                logger.exception("Community membership sync failed at registration for profile id=%s", profile.pk)
 
         return user
 

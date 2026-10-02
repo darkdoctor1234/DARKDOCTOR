@@ -8,6 +8,9 @@ import { collegeApi, type College } from "@/lib/collegeApi";
 import { STATUS_OPTIONS, type StatusValue, UG_YEAR_OPTIONS, PG_YEAR_OPTIONS, type YearOfStudyValue } from "@/lib/profileApi";
 import { DEPARTMENT_GROUPS } from "@/lib/departments";
 import { matchesQuery } from "@/lib/search";
+import { isPasswordValid } from "@/lib/password";
+import { PasswordRequirements } from "@/components/PasswordRequirements";
+import { OtpInput } from "@/components/OtpInput";
 
 function collegeFields(status: StatusValue, edu: "ug" | "pg" | "") {
   switch (status) {
@@ -102,11 +105,38 @@ export default function SignupPage() {
   const [usernameStatus,  setUsernameStatus]  = useState<"idle"|"checking"|"available"|"taken"|"invalid">("idle");
   const [usernameMsg,     setUsernameMsg]     = useState("");
   const [email,           setEmail]           = useState("");
+  // Email must be verified via OTP before an account can be created —
+  // otpPhase tracks where step 1 is in that gate: "form" (not sent yet),
+  // "awaiting" (code sent, box shown), "verified" (locked in, can proceed).
+  const [otpPhase,     setOtpPhase]     = useState<"form" | "awaiting" | "verified">("form");
+  const [otpCode,      setOtpCode]      = useState("");
+  const [otpSending,   setOtpSending]   = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [otpError,     setOtpError]     = useState("");
+  const [otpShakeToken, setOtpShakeToken] = useState(0);
+  const [otpDevCode,   setOtpDevCode]   = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const resendTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => () => { if (resendTimer.current) clearInterval(resendTimer.current); }, []);
+  function startResendCooldown() {
+    setResendCooldown(45);
+    if (resendTimer.current) clearInterval(resendTimer.current);
+    resendTimer.current = setInterval(() => {
+      setResendCooldown((s) => {
+        if (s <= 1) { if (resendTimer.current) clearInterval(resendTimer.current); return 0; }
+        return s - 1;
+      });
+    }, 1000);
+  }
   const [password,        setPassword]        = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPwd,         setShowPwd]         = useState(false);
   const [showConfirmPwd,  setShowConfirmPwd]  = useState(false);
   const usernameTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Guards against an in-flight check for a stale value resolving after a
+  // newer one (e.g. type → pause → edit again before the first response
+  // lands) and clobbering the correct, more recent status.
+  const latestUsernameCheck = useRef("");
 
   const [status,     setStatus]     = useState<StatusValue>("");
   const [highestEdu, setHighestEdu] = useState<"ug" | "pg" | "">("");
@@ -114,6 +144,7 @@ export default function SignupPage() {
   const [pgCollege,  setPgCollege]  = useState<number | null>(null);
   const [pgDepartment, setPgDepartment] = useState("");
   const [batch,      setBatch]      = useState("");
+  const [pgBatch,    setPgBatch]    = useState("");
   const [yearOfStudy, setYearOfStudy] = useState<YearOfStudyValue>("");
   const [colleges,   setColleges]   = useState<College[]>([]);
 
@@ -127,7 +158,19 @@ export default function SignupPage() {
   // PG Aspirants haven't started PG yet, so they don't have a specialty to
   // report — only actual PG students/graduates/faculty do.
   const showPgDept = showPg && status !== "pg_aspirant";
-  const needsBatch = status === "ug_student" || status === "pg_student" || status === "alumni";
+  // `batch` (UG year) and `pg_batch` (PG year) each mean "year joined" while
+  // still pursuing that level, or "year completed" once it's finished —
+  // everyone except ug_aspirant/other has at least finished or is at least
+  // pursuing UG, and pg_student/working_professional/alumni/faculty may
+  // additionally need a PG year (joining or completion respectively).
+  const needsBatch = status === "ug_student" || status === "pg_aspirant" || status === "pg_student"
+    || status === "working_professional" || status === "alumni" || status === "faculty";
+  const needsPgBatch = status === "pg_student"
+    || ((status === "working_professional" || status === "alumni" || status === "faculty") && highestEdu === "pg");
+  const isPursuingUg = status === "ug_student";
+  const isPursuingPg = status === "pg_student";
+  const batchLabel   = isPursuingUg ? "year you joined" : "year you completed UG";
+  const pgBatchLabel = isPursuingPg ? "year you joined" : "year you completed PG";
   // Year of study is distinct from Batch (admission year) — it's which year
   // of the course they're in right now, so only meaningful for someone
   // currently enrolled, not alumni (already graduated).
@@ -135,10 +178,6 @@ export default function SignupPage() {
   const yearOptions = status === "pg_student" ? PG_YEAR_OPTIONS : UG_YEAR_OPTIONS;
   const ugColleges = colleges.filter((c) => c.is_ug);
   const pgColleges = colleges.filter((c) => c.is_pg);
-
-  const pwdStrength   = password.length === 0 ? 0 : password.length < 6 ? 1 : password.length < 10 ? 2 : 3;
-  const strengthColor = ["transparent", "var(--dd-danger)", "var(--dd-warning)", "var(--dd-success)"][pwdStrength];
-  const strengthLabel = ["", "Too short", "Fair", "Strong"][pwdStrength];
 
   useEffect(() => { if (isAuthenticated()) router.replace("/feed"); }, [router]);
 
@@ -149,7 +188,7 @@ export default function SignupPage() {
   }, [step, colleges.length]);
 
   function handleStatusChange(v: StatusValue) {
-    setStatus(v); setHighestEdu(""); setUgCollege(null); setPgCollege(null); setBatch("");
+    setStatus(v); setHighestEdu(""); setUgCollege(null); setPgCollege(null); setBatch(""); setPgBatch("");
   }
   function handleEduChange(v: "ug" | "pg") {
     setHighestEdu(v);
@@ -159,6 +198,7 @@ export default function SignupPage() {
   const checkUsername = useCallback((value: string) => {
     if (usernameTimer.current) clearTimeout(usernameTimer.current);
     const trimmed = value.trim();
+    latestUsernameCheck.current = trimmed;
     if (!trimmed) { setUsernameStatus("idle"); setUsernameMsg(""); return; }
     if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
       setUsernameStatus("invalid"); setUsernameMsg("Letters, numbers and underscores only."); return;
@@ -170,32 +210,81 @@ export default function SignupPage() {
     usernameTimer.current = setTimeout(async () => {
       try {
         const res = await authApi.checkUsername(trimmed);
+        if (latestUsernameCheck.current !== trimmed) return; // a newer edit has since superseded this check
         if (res.available) { setUsernameStatus("available"); setUsernameMsg("Username is available!"); }
         else               { setUsernameStatus("taken");     setUsernameMsg(res.error || "Username already taken."); }
-      } catch { setUsernameStatus("idle"); setUsernameMsg(""); }
+      } catch {
+        if (latestUsernameCheck.current !== trimmed) return;
+        setUsernameStatus("idle"); setUsernameMsg("Couldn't check right now — try again in a moment.");
+      }
     }, 500);
   }, []);
 
-  async function goToStep2() {
+  function validateStep1Fields(): boolean {
+    if (!fullName.trim())              { setError("Please enter your full name."); return false; }
+    if (!username.trim())              { setError("Please choose a username."); return false; }
+    if (usernameStatus === "taken")    { setError("That username is already taken. Pick another."); return false; }
+    if (usernameStatus === "invalid")  { setError(usernameMsg || "Invalid username."); return false; }
+    if (usernameStatus === "checking") { setError("Please wait, checking username…"); return false; }
+    if (!email.trim())                 { setError("Please enter your email."); return false; }
+    if (!isPasswordValid(password))   { setError("Password doesn't meet all the requirements below."); return false; }
+    if (confirmPassword !== password) { setError("Passwords do not match."); return false; }
+    return true;
+  }
+
+  // Step 1's "Continue" either starts the email-verification gate (not
+  // verified yet) or, once verified, just moves on — email itself was
+  // already confirmed available at send-otp time, no need to re-check.
+  async function handleStep1Continue() {
     setError("");
-    if (!fullName.trim())              { setError("Please enter your full name."); return; }
-    if (!username.trim())              { setError("Please choose a username."); return; }
-    if (usernameStatus === "taken")    { setError("That username is already taken. Pick another."); return; }
-    if (usernameStatus === "invalid")  { setError(usernameMsg || "Invalid username."); return; }
-    if (usernameStatus === "checking") { setError("Please wait, checking username…"); return; }
-    if (!email.trim())                 { setError("Please enter your email."); return; }
-    if (password.length < 6)          { setError("Password must be at least 6 characters."); return; }
-    if (confirmPassword !== password) { setError("Passwords do not match."); return; }
+    if (otpPhase === "verified") { setStep(2); return; }
+    if (!validateStep1Fields()) return;
     setLoading(true);
     try {
-      const { available } = await authApi.checkEmail(email.trim().toLowerCase());
-      if (!available) { setError("An account with this email already exists."); return; }
-    } catch {
-      // network error — let the final submit surface it
+      const res = await authApi.sendSignupOtp(email.trim().toLowerCase());
+      setOtpDevCode(res.dev_otp ?? "");
+      setOtpCode("");
+      setOtpError("");
+      setOtpPhase("awaiting");
+      startResendCooldown();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setLoading(false);
     }
-    setStep(2);
+  }
+
+  async function verifyOtp() {
+    setOtpError("");
+    if (otpCode.length !== 6) { setOtpError("Enter the 6-digit code."); setOtpShakeToken((t) => t + 1); return; }
+    setOtpVerifying(true);
+    try {
+      await authApi.verifySignupOtp(email.trim().toLowerCase(), otpCode);
+      setOtpPhase("verified");
+      setStep(2);
+    } catch (err: unknown) {
+      setOtpError(err instanceof Error ? err.message : "Something went wrong.");
+      setOtpShakeToken((t) => t + 1);
+    } finally {
+      setOtpVerifying(false);
+    }
+  }
+
+  async function resendOtp() {
+    if (resendCooldown > 0) return;
+    setOtpError("");
+    try {
+      const res = await authApi.sendSignupOtp(email.trim().toLowerCase());
+      setOtpDevCode(res.dev_otp ?? "");
+      setOtpCode("");
+      startResendCooldown();
+    } catch (err: unknown) {
+      setOtpError(err instanceof Error ? err.message : "Something went wrong.");
+    }
+  }
+
+  function changeEmail() {
+    setOtpPhase("form"); setOtpCode(""); setOtpError(""); setOtpDevCode("");
   }
 
   function goToStep3() {
@@ -205,7 +294,11 @@ export default function SignupPage() {
       return;
     }
     if (needsBatch && !batch.trim()) {
-      setError("Please enter your batch year.");
+      setError(isPursuingUg ? "Please enter the year you joined." : "Please enter the year you completed UG.");
+      return;
+    }
+    if (needsPgBatch && !pgBatch.trim()) {
+      setError(isPursuingPg ? "Please enter the year you joined PG." : "Please enter the year you completed PG.");
       return;
     }
     setStep(3);
@@ -227,6 +320,7 @@ export default function SignupPage() {
         pg_college:        showPg ? pgCollege : null,
         pg_department:     showPgDept ? pgDepartment : undefined,
         batch:             needsBatch ? batch.trim() : undefined,
+        pg_batch:          needsPgBatch ? pgBatch.trim() : undefined,
         year_of_study:     showYearOfStudy ? yearOfStudy : undefined,
         phone:             phone.trim()   || undefined,
         address:           address.trim() || undefined,
@@ -290,10 +384,7 @@ export default function SignupPage() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <span style={{ display: "inline-flex" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.png" className="dd-logo-light" alt="Darkdoctor" draggable={false}
-              style={{ height: "72px", width: "auto", objectFit: "contain" }} />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo-dark.png" className="dd-logo-dark" alt="Darkdoctor" draggable={false}
+              <img src="/logo.png" alt="Darkdoctor" draggable={false}
               style={{ height: "72px", width: "auto", objectFit: "contain" }} />
             </span>
           </button>
@@ -311,7 +402,7 @@ export default function SignupPage() {
           {step === 1 && (
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <div>
-                <Label>Full Name <span style={{ color: "#0d9488" }}>*</span></Label>
+                <Label>Full Name <span style={{ color: "#0d9488" }}>*</span> <span style={{ fontWeight: 400, color: "var(--dd-text3)", textTransform: "none", letterSpacing: 0 }}>(private — never shown publicly)</span></Label>
                 <input id="signup-full-name" name="name" type="text" value={fullName} onChange={(e) => setFullName(e.target.value)}
                   placeholder="Your full name" autoComplete="name" autoFocus
                   style={inputBase} onFocus={focusBlue} onBlur={blurDefault} />
@@ -348,9 +439,54 @@ export default function SignupPage() {
 
               <div>
                 <Label>Email Address <span style={{ color: "#0d9488" }}>*</span></Label>
-                <input id="signup-email" name="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com" autoComplete="email"
-                  style={inputBase} onFocus={focusBlue} onBlur={blurDefault} />
+                <div style={{ position: "relative" }}>
+                  <input id="signup-email" name="email" type="email" value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com" autoComplete="email"
+                    disabled={otpPhase !== "form"}
+                    style={{ ...inputBase, paddingRight: otpPhase === "verified" ? "92px" : undefined, opacity: otpPhase !== "form" ? 0.75 : 1, textOverflow: "ellipsis" }}
+                    onFocus={focusBlue} onBlur={blurDefault} />
+                  {otpPhase === "verified" && (
+                    <div style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: "3px", fontSize: "0.72rem", fontWeight: 600, color: "var(--dd-success)" }}>
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M3 8l4 4 6-7"/></svg>
+                        Verified
+                      </span>
+                      <button type="button" onClick={changeEmail} style={{ background: "none", border: "none", color: "var(--dd-text3)", fontSize: "0.72rem", textDecoration: "underline", cursor: "pointer", padding: 0 }}>
+                        Change
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {otpPhase === "awaiting" && (
+                  <div style={{ marginTop: "12px", padding: "16px", borderRadius: "14px", background: "var(--dd-surface)", border: "1px solid var(--dd-border)" }}>
+                    <p style={{ fontSize: "0.8125rem", color: "var(--dd-text2)", marginBottom: "12px" }}>
+                      We sent a 6-digit code to <strong style={{ color: "var(--dd-text1)" }}>{email}</strong>.
+                    </p>
+                    {otpDevCode && (
+                      <div style={{ marginBottom: "12px", padding: "6px 12px", borderRadius: "8px", background: "var(--dd-warning-bg)", border: "1px solid var(--dd-warning-border)", display: "inline-block" }}>
+                        <span style={{ fontSize: "0.7rem", color: "var(--dd-warning)", fontWeight: 600 }}>Dev mode, your code: </span>
+                        <span className="num" style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--dd-warning)", letterSpacing: "0.08em" }}>{otpDevCode}</span>
+                      </div>
+                    )}
+                    <OtpInput value={otpCode} onChange={setOtpCode} autoFocus shakeToken={otpShakeToken} />
+                    {otpError && <p style={{ marginTop: "10px", fontSize: "0.78rem", color: "var(--dd-danger)", textAlign: "center" }}>{otpError}</p>}
+                    <button type="button" onClick={verifyOtp} disabled={otpVerifying}
+                      style={{ width: "100%", marginTop: "14px", padding: "11px", borderRadius: "10px", background: "linear-gradient(135deg,#0d9488 0%,#ac2430 100%)", border: "none", color: "#fff", fontSize: "0.875rem", fontWeight: 600, cursor: otpVerifying ? "wait" : "pointer", opacity: otpVerifying ? 0.75 : 1 }}>
+                      {otpVerifying ? "Verifying…" : "Verify Email"}
+                    </button>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px" }}>
+                      <button type="button" onClick={changeEmail} style={{ background: "none", border: "none", color: "var(--dd-text3)", fontSize: "0.75rem", cursor: "pointer", padding: 0 }}>
+                        ← Edit email
+                      </button>
+                      <button type="button" onClick={resendOtp} disabled={resendCooldown > 0}
+                        style={{ background: "none", border: "none", color: resendCooldown > 0 ? "var(--dd-text4)" : "#0d9488", fontSize: "0.75rem", fontWeight: 500, cursor: resendCooldown > 0 ? "default" : "pointer", padding: 0 }}>
+                        {resendCooldown > 0 ? `Resend code (${resendCooldown}s)` : "Resend code"}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -364,7 +500,7 @@ export default function SignupPage() {
                 <Label>Password <span style={{ color: "#0d9488" }}>*</span></Label>
                 <div style={{ position: "relative" }}>
                   <input id="signup-password" name="password" type={showPwd ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Min. 6 characters" autoComplete="new-password"
+                    placeholder="Create a password" autoComplete="new-password"
                     style={{ ...inputBase, paddingRight: "42px" }} onFocus={focusBlue} onBlur={blurDefault} />
                   <button type="button" onClick={() => setShowPwd(!showPwd)}
                     style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--dd-text3)", padding: "2px" }}>
@@ -374,14 +510,7 @@ export default function SignupPage() {
                     }
                   </button>
                 </div>
-                {password.length > 0 && (
-                  <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
-                    <div style={{ flex: 1, height: "3px", borderRadius: "3px", background: "var(--dd-border2)", overflow: "hidden" }}>
-                      <div style={{ height: "100%", borderRadius: "3px", background: strengthColor, width: `${(pwdStrength / 3) * 100}%`, transition: "all 0.25s" }} />
-                    </div>
-                    <span style={{ fontSize: "0.72rem", color: strengthColor, fontWeight: 500, minWidth: "48px" }}>{strengthLabel}</span>
-                  </div>
-                )}
+                {password.length > 0 && <PasswordRequirements password={password} />}
               </div>
 
               <div>
@@ -409,11 +538,13 @@ export default function SignupPage() {
 
               {error && <ErrorBox>{error}</ErrorBox>}
 
-              <button type="button" onClick={goToStep2} disabled={loading}
-                style={{ padding: "12px", borderRadius: "12px", background: "linear-gradient(135deg,#0d9488 0%,#ac2430 100%)", border: "none", color: "#fff", fontSize: "0.9375rem", fontWeight: 600, cursor: loading ? "wait" : "pointer", marginTop: "4px", boxShadow: "0 4px 20px rgba(13,148,136,0.24)", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", opacity: loading ? 0.75 : 1 }}>
-                {loading ? "Checking…" : "Continue"}
-                {!loading && <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>}
-              </button>
+              {otpPhase !== "awaiting" && (
+                <button type="button" onClick={handleStep1Continue} disabled={loading}
+                  style={{ padding: "12px", borderRadius: "12px", background: "linear-gradient(135deg,#0d9488 0%,#ac2430 100%)", border: "none", color: "#fff", fontSize: "0.9375rem", fontWeight: 600, cursor: loading ? "wait" : "pointer", marginTop: "4px", boxShadow: "0 4px 20px rgba(13,148,136,0.24)", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", opacity: loading ? 0.75 : 1 }}>
+                  {loading ? "Sending code…" : otpPhase === "verified" ? "Continue" : "Send Verification Code"}
+                  {!loading && <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>}
+                </button>
+              )}
             </div>
           )}
 
@@ -506,9 +637,18 @@ export default function SignupPage() {
 
               {needsBatch && (
                 <div style={{ paddingTop: "14px", borderTop: "1px solid var(--dd-border)" }}>
-                  <Label>Batch <span style={{ fontWeight: 400, color: "var(--dd-text4)" }}>(year you joined)</span></Label>
+                  <Label>UG Year <span style={{ fontWeight: 400, color: "var(--dd-text4)" }}>({batchLabel})</span></Label>
                   <input id="signup-batch" name="batch" type="text" value={batch} onChange={(e) => setBatch(e.target.value)}
                     placeholder="e.g. 2016"
+                    style={inputBase} onFocus={focusBlue} onBlur={blurDefault} />
+                </div>
+              )}
+
+              {needsPgBatch && (
+                <div style={{ paddingTop: "14px", borderTop: needsBatch ? "none" : "1px solid var(--dd-border)" }}>
+                  <Label>PG Year <span style={{ fontWeight: 400, color: "var(--dd-text4)" }}>({pgBatchLabel})</span></Label>
+                  <input id="signup-pg-batch" name="pg_batch" type="text" value={pgBatch} onChange={(e) => setPgBatch(e.target.value)}
+                    placeholder="e.g. 2020"
                     style={inputBase} onFocus={focusBlue} onBlur={blurDefault} />
                 </div>
               )}

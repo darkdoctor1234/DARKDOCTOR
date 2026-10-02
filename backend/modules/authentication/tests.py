@@ -1,9 +1,19 @@
+import hashlib
 from django.core.cache import cache
 from django.test import TestCase
 from rest_framework.test import APIClient
 from rest_framework import status
 
 from modules.accounts.models import User
+
+
+def mark_email_verified(email: str) -> None:
+    """Test helper standing in for the real OTP round-trip (SendSignupOtpView
+    -> VerifySignupOtpView) — sets the same cache flag RegisterSerializer.validate()
+    checks, so tests that aren't specifically about the verification gate
+    itself don't need to simulate the whole email flow just to get past it."""
+    key = f"signup_verified_{hashlib.sha256(email.strip().lower().encode()).hexdigest()}"
+    cache.set(key, True, timeout=1800)
 
 
 class RegistrationTests(TestCase):
@@ -18,8 +28,9 @@ class RegistrationTests(TestCase):
             "full_name": "Asha Rao",
             "username": "asha_rao",
             "email": "asha@example.com",
-            "password": "correcthorse",
+            "password": "Correcthorse1!",
         }
+        mark_email_verified(self.valid_payload["email"])
 
     def test_register_creates_user_and_returns_tokens(self):
         response = self.client.post(self.url, self.valid_payload, format="json")
@@ -28,8 +39,12 @@ class RegistrationTests(TestCase):
         self.assertIn("refresh", response.data)
         self.assertEqual(response.data["user"]["email"], "asha@example.com")
         self.assertEqual(response.data["user"]["role"], User.Role.USER)
-        self.assertFalse(response.data["user"]["email_verified"])
+        # Verified at creation time now — the whole point of the pre-signup
+        # OTP gate (SendSignupOtpView/VerifySignupOtpView) is that an account
+        # can't exist at all without its email already having cleared it.
+        self.assertTrue(response.data["user"]["email_verified"])
         self.assertTrue(User.objects.filter(email="asha@example.com").exists())
+        self.assertTrue(User.objects.get(email="asha@example.com").email_verified)
 
     def test_register_rejects_duplicate_email(self):
         User.objects.create_user(email="asha@example.com", password="x", username="taken1")
@@ -66,7 +81,9 @@ class RegistrationTests(TestCase):
             "too similar to the account's own email": "asha@example",
         }
         for label, password in cases.items():
-            payload = {**self.valid_payload, "email": f"{label[:6]}@example.com".replace(" ", ""), "password": password}
+            email = f"{label[:6]}@example.com".replace(" ", "")
+            mark_email_verified(email)
+            payload = {**self.valid_payload, "email": email, "password": password}
             response = self.client.post(self.url, payload, format="json")
             self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, f"{label} ({password!r}) should be rejected")
             self.assertIn("password", response.data, f"{label} should fail on the password field specifically")
@@ -90,6 +107,95 @@ class RegistrationTests(TestCase):
         response = self.client.post(self.url, payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("ug_college", response.data)
+
+    def test_register_rejects_email_that_was_never_verified(self):
+        """The core guarantee of the pre-signup OTP gate: no verified-email
+        cache flag means no account, full stop — regardless of how strong
+        everything else about the submission is."""
+        payload = {**self.valid_payload, "email": "never-verified@example.com"}
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("email", response.data)
+        self.assertFalse(User.objects.filter(email="never-verified@example.com").exists())
+
+
+class SignupOtpGateTests(TestCase):
+    """SendSignupOtpView / VerifySignupOtpView — the pre-signup email
+    verification gate that RegisterSerializer.validate() enforces (see
+    RegistrationTests.test_register_rejects_email_that_was_never_verified
+    for the enforcement side)."""
+
+    def setUp(self):
+        cache.clear()
+        self.client = APIClient()
+        self.send_url = "/api/v1/auth/signup/send-otp/"
+        self.verify_url = "/api/v1/auth/signup/verify-otp/"
+        self.register_url = "/api/v1/auth/register/"
+        self.email = "newstudent@example.com"
+
+    def test_send_otp_returns_dev_otp_in_debug_without_smtp(self):
+        response = self.client.post(self.send_url, {"email": self.email}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("dev_otp", response.data)
+
+    def test_send_otp_rejects_already_registered_email(self):
+        User.objects.create_user(email=self.email, password="x", username="existing")
+        response = self.client.post(self.send_url, {"email": self.email}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_send_otp_rejects_malformed_email(self):
+        """Unlike RegisterSerializer (a real EmailField), this view reads
+        the raw request body — without its own format check, a malformed
+        address would "successfully" generate an OTP that can never be
+        delivered, dead-ending signup with no visible error."""
+        response = self.client.post(self.send_url, {"email": "not-an-email"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_verify_otp_rejects_wrong_code(self):
+        self.client.post(self.send_url, {"email": self.email}, format="json")
+        response = self.client.post(self.verify_url, {"email": self.email, "otp": "000000"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_verify_otp_rejects_code_for_a_different_email(self):
+        send_response = self.client.post(self.send_url, {"email": self.email}, format="json")
+        otp = send_response.data["dev_otp"]
+        response = self.client.post(self.verify_url, {"email": "someone-else@example.com", "otp": otp}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_full_send_verify_register_flow_succeeds(self):
+        send_response = self.client.post(self.send_url, {"email": self.email}, format="json")
+        otp = send_response.data["dev_otp"]
+
+        verify_response = self.client.post(self.verify_url, {"email": self.email, "otp": otp}, format="json")
+        self.assertEqual(verify_response.status_code, status.HTTP_200_OK)
+        self.assertTrue(verify_response.data["verified"])
+
+        register_response = self.client.post(self.register_url, {
+            "full_name": "New Student", "username": "new_student_99",
+            "email": self.email, "password": "Xk7$mQp2vLwN9z",
+        }, format="json")
+        self.assertEqual(register_response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(User.objects.get(email=self.email).email_verified)
+
+    def test_otp_is_single_use(self):
+        """Verifying consumes the code — replaying it (e.g. a second,
+        unrelated registration attempt) must not work twice."""
+        send_response = self.client.post(self.send_url, {"email": self.email}, format="json")
+        otp = send_response.data["dev_otp"]
+        first = self.client.post(self.verify_url, {"email": self.email, "otp": otp}, format="json")
+        self.assertEqual(first.status_code, status.HTTP_200_OK)
+
+        second = self.client.post(self.verify_url, {"email": self.email, "otp": otp}, format="json")
+        self.assertEqual(second.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_resending_invalidates_the_previous_code(self):
+        first_send = self.client.post(self.send_url, {"email": self.email}, format="json")
+        old_otp = first_send.data["dev_otp"]
+        cache.delete(f"signup_otp_cooldown_{hashlib.sha256(self.email.encode()).hexdigest()}")  # bypass cooldown for the test
+        self.client.post(self.send_url, {"email": self.email}, format="json")
+
+        response = self.client.post(self.verify_url, {"email": self.email, "otp": old_otp}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
 class LoginTests(TestCase):
@@ -227,10 +333,10 @@ class PasswordResetTests(TestCase):
     def test_reset_password_with_correct_otp_succeeds(self):
         otp = self.client.post("/api/v1/auth/forgot-password/", {"email": "reset@example.com"}, format="json").data["dev_otp"]
         response = self.client.post("/api/v1/auth/reset-password/", {
-            "email": "reset@example.com", "otp": otp, "new_password": "brandnewpass",
+            "email": "reset@example.com", "otp": otp, "new_password": "Brandnewpass1!",
         }, format="json")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        login = self.client.post("/api/v1/auth/user/login/", {"email": "reset@example.com", "password": "brandnewpass"}, format="json")
+        login = self.client.post("/api/v1/auth/user/login/", {"email": "reset@example.com", "password": "Brandnewpass1!"}, format="json")
         self.assertEqual(login.status_code, status.HTTP_200_OK)
 
     def test_reset_password_with_wrong_otp_fails_and_leaves_password_unchanged(self):
@@ -264,11 +370,11 @@ class PasswordResetTests(TestCase):
     def test_reset_password_otp_is_single_use(self):
         otp = self.client.post("/api/v1/auth/forgot-password/", {"email": "reset@example.com"}, format="json").data["dev_otp"]
         first = self.client.post("/api/v1/auth/reset-password/", {
-            "email": "reset@example.com", "otp": otp, "new_password": "firstnewpass",
+            "email": "reset@example.com", "otp": otp, "new_password": "Firstnewpass1!",
         }, format="json")
         self.assertEqual(first.status_code, status.HTTP_200_OK)
         second = self.client.post("/api/v1/auth/reset-password/", {
-            "email": "reset@example.com", "otp": otp, "new_password": "secondnewpass",
+            "email": "reset@example.com", "otp": otp, "new_password": "Secondnewpass1!",
         }, format="json")
         self.assertEqual(second.status_code, status.HTTP_400_BAD_REQUEST)
 

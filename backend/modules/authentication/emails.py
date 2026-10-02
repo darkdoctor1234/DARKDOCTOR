@@ -4,11 +4,16 @@ Email sending for OTP-based flows (email verification, password reset).
 Uses Django's send_mail, backed by whatever EMAIL_BACKEND is configured in
 settings (real SMTP if EMAIL_HOST is set, otherwise the console backend,
 which just prints the email to the server log). Callers never need to know
-which backend is active, a call to send_mail() always "succeeds" either way.
+which backend is active — a send failure is caught and logged here, never
+raised, so an email outage still can't break signup/login flows, but unlike
+before (fail_silently=True) the failure is no longer completely invisible.
 """
 
+import logging
 from django.conf import settings
 from django.core.mail import send_mail
+
+logger = logging.getLogger(__name__)
 
 
 def _send_otp_email(to_email: str, subject: str, heading: str, otp: str, footer: str) -> None:
@@ -18,13 +23,16 @@ def _send_otp_email(to_email: str, subject: str, heading: str, otp: str, footer:
         f"This code expires in 15 minutes. If you didn't request this, you can ignore this email.\n\n"
         f"{footer}"
     )
-    send_mail(
-        subject=subject,
-        message=body,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[to_email],
-        fail_silently=True,  # never let an email outage break signup/login flows
-    )
+    try:
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[to_email],
+            fail_silently=False,
+        )
+    except Exception:
+        logger.exception("Failed to send OTP email to %s (subject=%r)", to_email, subject)
 
 
 def send_verification_email(to_email: str, otp: str) -> None:

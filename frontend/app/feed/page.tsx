@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import UserShell from "@/components/UserShell";
 import CollegeCard from "@/components/colleges/CollegeCard";
 import { collegeApi, type College, type Review } from "@/lib/collegeApi";
@@ -357,7 +358,12 @@ export default function FeedPage() {
   const pgColleges = colleges.filter((c) => c.is_pg);
   const selectedUgCollege = colleges.find((c) => c.id === ugCollege) ?? null;
   const selectedPgCollege = colleges.find((c) => c.id === pgCollege) ?? null;
-  const selectedColleges  = [selectedUgCollege, selectedPgCollege].filter(Boolean) as College[];
+  const selectedColleges  = (
+    [
+      selectedUgCollege && { tag: "ug" as const, college: selectedUgCollege },
+      selectedPgCollege && { tag: "pg" as const, college: selectedPgCollege },
+    ].filter(Boolean) as { tag: "ug" | "pg"; college: College }[]
+  );
   const journeyCard = JOURNEY_CARDS.find((c) => c.value === status);
   // Signed-in users' feed always reflects their real profile status (edited
   // via Settings) — "Change preferences" is only for a signed-out guest who
@@ -763,7 +769,11 @@ export default function FeedPage() {
                   <div style={{ textAlign: "center", padding: "48px 0" }}>
                     <div style={{ color: "var(--dd-text4)", marginBottom: "12px", display: "flex", justifyContent: "center" }}><EmptyReviewsIcon /></div>
                     <p style={{ fontSize: "0.9375rem", color: "var(--dd-text3)", marginBottom: "6px" }}>No reviews yet</p>
-                    <p style={{ fontSize: "0.8125rem", color: "var(--dd-text4)" }}>Browse a college and be the first to leave a review!</p>
+                    <p style={{ fontSize: "0.8125rem", color: "var(--dd-text4)", marginBottom: "18px" }}>Browse a college and be the first to leave a review!</p>
+                    <Link href="/colleges" style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "9px 18px", borderRadius: "10px", background: "rgba(13,148,136,0.1)", border: "1px solid rgba(13,148,136,0.3)", color: "#0d9488", fontSize: "0.8125rem", fontWeight: 600, textDecoration: "none" }}>
+                      Browse Colleges
+                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+                    </Link>
                   </div>
                 )}
               </>
@@ -802,8 +812,8 @@ export default function FeedPage() {
                   Your college{selectedColleges.length > 1 ? "s" : ""}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: selectedColleges.length > 1 ? "repeat(auto-fill,minmax(260px,1fr))" : "1fr", gap: "14px" }}>
-                  {selectedColleges.map((college) => (
-                    <CollegeCard key={college.id} college={college} isSuperAdmin={false} onEdit={() => {}} onDelete={() => {}} />
+                  {selectedColleges.map(({ tag, college }) => (
+                    <CollegeCard key={`${tag}-${college.id}`} college={college} isSuperAdmin={false} onEdit={() => {}} onDelete={() => {}} />
                   ))}
                 </div>
               </div>
@@ -855,7 +865,11 @@ export default function FeedPage() {
                   <div style={{ textAlign: "center", padding: "48px 0" }}>
                     <div style={{ color: "var(--dd-text4)", marginBottom: "12px", display: "flex", justifyContent: "center" }}><EmptyReviewsIcon /></div>
                     <p style={{ fontSize: "0.9375rem", color: "var(--dd-text3)", marginBottom: "6px" }}>No reviews yet</p>
-                    <p style={{ fontSize: "0.8125rem", color: "var(--dd-text4)" }}>Browse a college and be the first to leave a review!</p>
+                    <p style={{ fontSize: "0.8125rem", color: "var(--dd-text4)", marginBottom: "18px" }}>Browse a college and be the first to leave a review!</p>
+                    <Link href="/colleges" style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "9px 18px", borderRadius: "10px", background: "rgba(13,148,136,0.1)", border: "1px solid rgba(13,148,136,0.3)", color: "#0d9488", fontSize: "0.8125rem", fontWeight: 600, textDecoration: "none" }}>
+                      Browse Colleges
+                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+                    </Link>
                   </div>
                 )}
               </>

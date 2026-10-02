@@ -661,10 +661,7 @@ export default function AddCollegePage() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <span style={{ display: "inline-flex" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.png" className="dd-logo-light" alt="Darkdoctor" draggable={false}
-              style={{ height: "46px", width: "auto", objectFit: "contain" }} />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo-dark.png" className="dd-logo-dark" alt="Darkdoctor" draggable={false}
+              <img src="/logo.png" alt="Darkdoctor" draggable={false}
               style={{ height: "46px", width: "auto", objectFit: "contain" }} />
             </span>
           </button>
