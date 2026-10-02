@@ -12,6 +12,20 @@ COLLEGE_EDIT_GRACE_PERIOD = timedelta(hours=48)
 
 
 class UserManager(BaseUserManager):
+    def get_by_natural_key(self, username):
+        # Case-insensitive, matching ForgotPasswordView/ResetPasswordView's
+        # email__iexact lookup. Without this override, Django's default here
+        # is an EXACT match on USERNAME_FIELD (email) — fine for accounts
+        # created through RegisterSerializer (which always lowercases first),
+        # but an account seeded any other way (e.g. SUPERADMIN_EMAIL/a
+        # management command) only has its *domain* lowercased by
+        # normalize_email, never its local part, so a mixed-case local part
+        # could never log in by typing the address in lowercase as a human
+        # naturally would. This fixes every login path at the source
+        # (django.contrib.auth.backends.ModelBackend calls this), not just
+        # the forgot-password views.
+        return self.get(**{f"{self.model.USERNAME_FIELD}__iexact": username})
+
     def create_user(self, email, password=None, **extra_fields):
         if not email:
             raise ValueError("Email is required")
@@ -140,7 +154,23 @@ class UserProfile(models.Model):
     )
     batch = models.CharField(
         max_length=20, blank=True, default="",
-        help_text="Batch/admission year, e.g. 2016. Required when current_status is a student or alumni status. Distinct from year_of_study (which year of the course they're currently in) — the two are not the same thing.",
+        help_text=(
+            "The UG year: admission year while still pursuing UG "
+            "(ug_student), or completion year once UG is finished "
+            "(pg_aspirant/pg_student and any working_professional/alumni/"
+            "faculty profile, regardless of highest_education — PG itself "
+            "always requires having finished UG first). Distinct from "
+            "year_of_study (which year of the course they're currently in)."
+        ),
+    )
+    pg_batch = models.CharField(
+        max_length=20, blank=True, default="",
+        help_text=(
+            "The PG year: admission year while still pursuing PG "
+            "(pg_student), or completion year once PG is finished "
+            "(working_professional/alumni/faculty with highest_education "
+            "== pg). Blank for anyone who hasn't done PG."
+        ),
     )
 
     class YearOfStudy(models.TextChoices):
@@ -168,8 +198,24 @@ class UserProfile(models.Model):
 
     @property
     def is_community_eligible(self) -> bool:
-        """PG doctors (student/working/alumni) and faculty — never UG."""
-        return self.current_status in self.COMMUNITY_ELIGIBLE_STATUSES
+        """PG doctors (student/working/alumni) and faculty — never UG.
+
+        PG_STUDENT is inherently a PG doctor. The other three
+        community-eligible statuses (working professional/alumni/faculty)
+        span people whose *highest* education was only ever UG as well as
+        people who went on to PG — only the latter actually have a PG
+        specialty to be put in a Specialty Community for, so this also
+        requires highest_education == PG for those three. Without this,
+        a UG-only working professional/alumni/faculty profile was being
+        treated as eligible with no way to ever supply a pg_department
+        (Settings never even shows that field to them), silently capping
+        them at 1 of the 3 expected communities forever.
+        """
+        if self.current_status == self.Status.PG_STUDENT:
+            return True
+        if self.current_status in (self.Status.WORKING_PROFESSIONAL, self.Status.ALUMNI, self.Status.FACULTY):
+            return self.highest_education == self.Education.PG
+        return False
 
     def is_college_locked(self, field: str) -> bool:
         """Whether `field` ("ug_college" or "pg_college") can no longer be

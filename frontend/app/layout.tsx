@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Serif, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
-import { ThemeProvider } from "@/lib/themeContext";
 
 const plexSerif = IBM_Plex_Serif({
   subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-plex-serif", display: "swap",
@@ -44,17 +43,9 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`h-full ${plexSerif.variable} ${plexSans.variable} ${plexMono.variable}`} suppressHydrationWarning>
-      <head>
-        {/* Anti-flash: apply saved theme before first paint */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem('dd_theme')||'light';document.documentElement.setAttribute('data-theme',t);}catch(e){}`,
-          }}
-        />
-      </head>
+    <html lang="en" className={`h-full ${plexSerif.variable} ${plexSans.variable} ${plexMono.variable}`}>
       <body className="min-h-full flex flex-col antialiased">
-        <ThemeProvider>{children}</ThemeProvider>
+        {children}
       </body>
     </html>
   );

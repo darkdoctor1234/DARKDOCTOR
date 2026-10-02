@@ -1,12 +1,19 @@
 ﻿"use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Review, collegeApi } from "@/lib/collegeApi";
 import { getUser } from "@/lib/auth";
 
 interface Props {
   review: Review;
   onReport?: () => void;
+  /** Hide the college name line — only when the surrounding page already
+   * makes the college obvious (its own detail page). Everywhere reviews
+   * from multiple colleges can appear together (feed, profile), this
+   * defaults to showing it — otherwise there's no way to tell which
+   * college a given review is even about. */
+  showCollege?: boolean;
 }
 
 const RATING_LABELS = [
@@ -103,7 +110,7 @@ function ReportModal({ reviewId, onClose }: { reviewId: number; onClose: () => v
   );
 }
 
-export default function ReviewCard({ review, onReport }: Props) {
+export default function ReviewCard({ review, onReport, showCollege = true }: Props) {
   const [helpfulCount, setHelpfulCount] = useState(review.helpful_count);
   const [isHelpful,    setIsHelpful]    = useState(false);
   const [reporting,    setReporting]    = useState(false);
@@ -143,6 +150,19 @@ export default function ReviewCard({ review, onReport }: Props) {
         onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--dd-border2)"; }}
         onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--dd-border)"; }}
       >
+        {showCollege && (
+          <Link href={`/colleges/${review.college}`} style={{
+            display: "inline-flex", alignItems: "center", gap: "6px",
+            fontSize: "0.8125rem", fontWeight: 600, color: "#0d9488",
+            textDecoration: "none", marginBottom: "10px",
+          }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"/>
+            </svg>
+            {review.college_name}
+          </Link>
+        )}
+
         {/* Header */}
         <div style={{ display: "flex", gap: "12px", alignItems: "flex-start", marginBottom: "14px" }}>
           <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: "var(--dd-surface2)", border: "1px solid var(--dd-border2)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--dd-text3)", flexShrink: 0 }}>

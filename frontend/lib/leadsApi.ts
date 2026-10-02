@@ -20,19 +20,25 @@ export interface Lead {
   registered_at:     string;   // account registered
 }
 
-function authHeaders(): Record<string, string> {
-  const token = getAccessToken();
+function authHeaders(token: string | null): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-// 401 with a token present means the token expired — clear the session and
-// redirect to the root so the user can log back in (same pattern as collegeApi.ts).
-async function handleExpiredSession(res: Response): Promise<void> {
-  if (res.status !== 401) return;
-  const { clearSession } = await import("./auth");
-  clearSession();
-  if (typeof window !== "undefined") window.location.replace("/");
-  throw new Error("Session expired. Please log in again.");
+/** Runs `makeRequest` with the current access token; on 401, tries one
+ * silent refresh and retries once before giving up and logging out. */
+async function withAuthRetry(makeRequest: (token: string | null) => Promise<Response>): Promise<Response> {
+  let res = await makeRequest(getAccessToken());
+  if (res.status === 401) {
+    const { refreshAccessToken, clearSession } = await import("./auth");
+    const newToken = await refreshAccessToken();
+    if (newToken) res = await makeRequest(newToken);
+    if (res.status === 401) {
+      clearSession();
+      if (typeof window !== "undefined") window.location.replace("/");
+      throw new Error("Session expired. Please log in again.");
+    }
+  }
+  return res;
 }
 
 export interface LeadFilterParams {
@@ -57,8 +63,7 @@ export const leadsApi = {
   list: async (params?: LeadFilterParams): Promise<Lead[]> => {
     const qs = buildLeadQuery(params);
     const url = `${BASE_URL}/accounts/leads/${qs.toString() ? `?${qs}` : ""}`;
-    const res = await fetch(url, { headers: authHeaders() });
-    await handleExpiredSession(res);
+    const res = await withAuthRetry((token) => fetch(url, { headers: authHeaders(token) }));
     if (!res.ok) throw new Error("Failed to load leads.");
     return res.json() as Promise<Lead[]>;
   },
@@ -66,8 +71,7 @@ export const leadsApi = {
   exportCsv: async (params?: LeadFilterParams): Promise<void> => {
     const qs = buildLeadQuery(params);
     const url = `${BASE_URL}/accounts/leads/export/${qs.toString() ? `?${qs}` : ""}`;
-    const res = await fetch(url, { headers: authHeaders() });
-    await handleExpiredSession(res);
+    const res = await withAuthRetry((token) => fetch(url, { headers: authHeaders(token) }));
     if (!res.ok) throw new Error("Export failed.");
     const blob = await res.blob();
     const href = URL.createObjectURL(blob);

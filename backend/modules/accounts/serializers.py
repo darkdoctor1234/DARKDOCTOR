@@ -154,6 +154,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "pg_college_locked",
             "pg_department",
             "batch",
+            "pg_batch",
             "year_of_study",
             "phone",
             "address",
@@ -180,18 +181,52 @@ class UserProfileSerializer(serializers.ModelSerializer):
         return obj.is_college_locked("pg_college")
 
     def validate(self, attrs):
-        # Batch year is required once the user identifies as a current student or alumni.
-        # Fall back to the existing instance value for partial (PATCH) updates that don't
-        # touch these fields, so e.g. saving just a phone number doesn't re-trigger this.
+        # `batch` (the UG year) and `pg_batch` (the PG year) each mean either
+        # "year you joined" (still pursuing that level) or "year you
+        # completed it" (already finished) depending on status — see their
+        # help_text on the model. Fall back to the existing instance value
+        # for partial (PATCH) updates that don't touch these fields, so e.g.
+        # saving just a phone number doesn't re-trigger this.
         status = attrs.get("current_status", getattr(self.instance, "current_status", "") if self.instance else "")
-        batch  = attrs.get("batch", getattr(self.instance, "batch", "") if self.instance else "")
+        batch     = attrs.get("batch",    getattr(self.instance, "batch",    "") if self.instance else "")
+        pg_batch  = attrs.get("pg_batch", getattr(self.instance, "pg_batch", "") if self.instance else "")
+        highest_education = attrs.get("highest_education", getattr(self.instance, "highest_education", "") if self.instance else "")
+
+        # Everyone except "haven't started anything yet" (ug_aspirant) and
+        # "other" has at least finished or is at least pursuing UG.
         requires_batch = status in (
             UserProfile.Status.UG_STUDENT,
+            UserProfile.Status.PG_ASPIRANT,
             UserProfile.Status.PG_STUDENT,
+            UserProfile.Status.WORKING_PROFESSIONAL,
             UserProfile.Status.ALUMNI,
+            UserProfile.Status.FACULTY,
         )
         if requires_batch and not str(batch).strip():
-            raise serializers.ValidationError({"batch": "Batch year is required for students and alumni."})
+            raise serializers.ValidationError({"batch": "UG year is required for this status."})
+
+        # pg_batch additionally required while actually pursuing PG, or once
+        # PG is the highest completed level.
+        requires_pg_batch = status == UserProfile.Status.PG_STUDENT or (
+            status in (UserProfile.Status.WORKING_PROFESSIONAL, UserProfile.Status.ALUMNI, UserProfile.Status.FACULTY)
+            and highest_education == UserProfile.Education.PG
+        )
+        if requires_pg_batch and not str(pg_batch).strip():
+            raise serializers.ValidationError({"pg_batch": "PG year is required for this status."})
+
+        # pg_department drives Community auto-assignment (national + state
+        # specialty communities) — a profile that's actually community-eligible
+        # (see UserProfile.is_community_eligible — PG student, or PG-educated
+        # working professional/alumni/faculty) needs it, otherwise it silently
+        # only ever gets the National community instead of all 3.
+        highest_education = attrs.get("highest_education", getattr(self.instance, "highest_education", "") if self.instance else "")
+        pg_department = attrs.get("pg_department", getattr(self.instance, "pg_department", "") if self.instance else "")
+        is_eligible = status == UserProfile.Status.PG_STUDENT or (
+            status in (UserProfile.Status.WORKING_PROFESSIONAL, UserProfile.Status.ALUMNI, UserProfile.Status.FACULTY)
+            and highest_education == UserProfile.Education.PG
+        )
+        if is_eligible and not str(pg_department).strip():
+            raise serializers.ValidationError({"pg_department": "PG specialty is required for this status."})
         return attrs
 
 

@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/lib/api";
+import { isPasswordValid } from "@/lib/password";
+import { PasswordRequirements } from "@/components/PasswordRequirements";
+import { OtpInput } from "@/components/OtpInput";
 
 type Step = "email" | "otp" | "reset" | "done";
 
@@ -17,6 +20,7 @@ export default function ForgotPasswordPage() {
   const [showPwd,     setShowPwd]     = useState(false);
   const [loading,     setLoading]     = useState(false);
   const [error,       setError]       = useState("");
+  const [shakeToken,  setShakeToken]  = useState(0);
 
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -35,8 +39,8 @@ export default function ForgotPasswordPage() {
   async function handleResetSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (otp.length !== 6) return setError("Enter the 6-digit code.");
-    if (newPassword.length < 6) return setError("Password must be at least 6 characters.");
+    if (otp.length !== 6) { setShakeToken((t) => t + 1); return setError("Enter the 6-digit code."); }
+    if (!isPasswordValid(newPassword)) return setError("Password doesn't meet all the requirements below.");
     if (newPassword !== confirm) return setError("Passwords don't match.");
     setLoading(true);
     try {
@@ -44,6 +48,7 @@ export default function ForgotPasswordPage() {
       setStep("done");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
+      setShakeToken((t) => t + 1);
     } finally { setLoading(false); }
   }
 
@@ -68,9 +73,7 @@ export default function ForgotPasswordPage() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <span style={{ display: "inline-flex" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.png" className="dd-logo-light" alt="Darkdoctor" draggable={false} style={{ height: "72px", width: "auto", objectFit: "contain" }} />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo-dark.png" className="dd-logo-dark" alt="Darkdoctor" draggable={false} style={{ height: "72px", width: "auto", objectFit: "contain" }} />
+              <img src="/logo.png" alt="Darkdoctor" draggable={false} style={{ height: "72px", width: "auto", objectFit: "contain" }} />
             </span>
           </button>
         </div>
@@ -121,22 +124,15 @@ export default function ForgotPasswordPage() {
 
             <form onSubmit={handleResetSubmit} style={{ background: "var(--dd-surface2)", border: "1px solid var(--dd-border2)", borderRadius: "20px", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
               <div>
-                <label style={labelStyle}>6-Digit Code</label>
-                <input
-                  id="forgot-password-otp" name="otp"
-                  value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  placeholder="123456" inputMode="numeric" autoFocus maxLength={6}
-                  style={{ ...inputStyle, letterSpacing: "0.25em", fontSize: "1.2rem", textAlign: "center" }}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(13,148,136,0.5)"; }}
-                  onBlur={(e)  => { e.currentTarget.style.borderColor = "var(--dd-border2)"; }}
-                />
+                <label style={{ ...labelStyle, textAlign: "center" }}>6-Digit Code</label>
+                <OtpInput value={otp} onChange={setOtp} autoFocus shakeToken={shakeToken} />
               </div>
 
               <div>
                 <label style={labelStyle}>New Password</label>
                 <div style={{ position: "relative" }}>
                   <input id="forgot-password-new-password" name="new-password" type={showPwd ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Min. 6 characters"
+                    placeholder="Create a password"
                     style={{ ...inputStyle, paddingRight: "42px" }}
                     onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(13,148,136,0.5)"; }}
                     onBlur={(e)  => { e.currentTarget.style.borderColor = "var(--dd-border2)"; }}
@@ -148,6 +144,7 @@ export default function ForgotPasswordPage() {
                     }
                   </button>
                 </div>
+                {newPassword.length > 0 && <PasswordRequirements password={newPassword} />}
               </div>
 
               <div>

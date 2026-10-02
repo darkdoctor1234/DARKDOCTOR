@@ -458,7 +458,12 @@ export default function CollegesPage() {
         </div>
 
         {loading && (
-          <div style={{ padding: "60px", textAlign: "center", color: "var(--dd-text3)" }}>Loading colleges…</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            {[1,2,3,4].map((i) => (
+              <div key={i} style={{ height: "168px", borderRadius: "18px", background: "var(--dd-surface2)", animation: "collegesPulse 1.5s ease-in-out infinite", animationDelay: `${i * 0.12}s` }} />
+            ))}
+            <style>{`@keyframes collegesPulse{0%,100%{opacity:.25}50%{opacity:.55}}`}</style>
+          </div>
         )}
 
         {!loading && fetchErr && (

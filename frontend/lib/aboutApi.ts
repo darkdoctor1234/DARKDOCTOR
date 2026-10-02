@@ -22,21 +22,27 @@ export interface AboutData {
   social_handles: SocialHandle[];
 }
 
-async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = getAccessToken();
+async function doFetch(path: string, options: RequestInit, token: string | null): Promise<Response> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(`${BASE}${path}`, { ...options, headers: { ...headers, ...options.headers } });
+  return fetch(`${BASE}${path}`, { ...options, headers: { ...headers, ...options.headers } });
+}
+
+async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  let res = await doFetch(path, options, getAccessToken());
+  // 401 — try one silent refresh-and-retry before giving up (same pattern as collegeApi.ts).
+  if (res.status === 401) {
+    const { refreshAccessToken, clearSession } = await import("./auth");
+    const newToken = await refreshAccessToken();
+    if (newToken) res = await doFetch(path, options, newToken);
+    if (res.status === 401) {
+      clearSession();
+      if (typeof window !== "undefined") window.location.replace("/");
+      throw new Error("Session expired. Please log in again.");
+    }
+  }
   if (res.status === 204) return undefined as T;
   const data = await res.json();
-  // 401 with a token present means the token expired — clear the session and
-  // redirect to the root so the user can log back in (same pattern as collegeApi.ts).
-  if (res.status === 401) {
-    const { clearSession } = await import("./auth");
-    clearSession();
-    if (typeof window !== "undefined") window.location.replace("/");
-    throw new Error("Session expired. Please log in again.");
-  }
   if (!res.ok) {
     const d = data as Record<string, unknown>;
     const msg = (d.detail ?? d.non_field_errors ?? Object.values(d)[0]) as string;

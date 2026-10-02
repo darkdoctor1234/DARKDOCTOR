@@ -54,11 +54,21 @@ class SyncMembershipsTests(TestCase):
         })
 
     def test_working_professional_alumni_and_faculty_are_all_eligible(self):
+        # Eligible only when their highest education was actually PG — a
+        # UG-only working professional/alumni/faculty has no PG specialty to
+        # join a Specialty Community for (see is_community_eligible).
         for status_value in ("working_professional", "alumni", "faculty"):
             user = User.objects.create_user(email=f"{status_value}@example.com", password="x", username=status_value)
-            profile = UserProfile.objects.create(user=user, current_status=status_value)
+            profile = UserProfile.objects.create(user=user, current_status=status_value, highest_education="pg")
             eligible = sync_memberships(profile)
             self.assertEqual(len(eligible), 1)
+
+    def test_working_professional_with_only_ug_education_is_not_eligible(self):
+        user = User.objects.create_user(email="ugonly@example.com", password="x", username="ugonly")
+        profile = UserProfile.objects.create(user=user, current_status="working_professional", highest_education="ug")
+        eligible = sync_memberships(profile)
+        self.assertEqual(eligible, [])
+        self.assertEqual(CommunityMembership.objects.filter(user=user).count(), 0)
 
     def test_syncing_twice_does_not_duplicate_memberships(self):
         profile = UserProfile.objects.create(user=self.user, current_status="pg_student", pg_department="Anatomy", pg_college=self.college)
@@ -86,7 +96,7 @@ class DiscussionPostMembershipGateTests(TestCase):
         self.client = APIClient()
         self.member = User.objects.create_user(email="member@example.com", password="x", username="member1")
         self.outsider = User.objects.create_user(email="outsider@example.com", password="x", username="outsider1")
-        profile = UserProfile.objects.create(user=self.member, current_status="working_professional")
+        profile = UserProfile.objects.create(user=self.member, current_status="working_professional", highest_education="pg")
         sync_memberships(profile)
         self.community = CommunityMembership.objects.get(user=self.member).community
 
@@ -132,7 +142,7 @@ class DiscussionPostModerationTests(TestCase):
         self.author = User.objects.create_user(email="postauthor@example.com", password="x", username="postauthor")
         self.admin = User.objects.create_user(email="commadmin@example.com", password="x", username="commadmin", role=User.Role.ADMIN)
         self.superadmin = User.objects.create_user(email="commsuper@example.com", password="x", username="commsuper", role=User.Role.SUPER_ADMIN)
-        profile = UserProfile.objects.create(user=self.author, current_status="working_professional")
+        profile = UserProfile.objects.create(user=self.author, current_status="working_professional", highest_education="pg")
         sync_memberships(profile)
         self.community = CommunityMembership.objects.get(user=self.author).community
         self.post = DiscussionPost.objects.create(community=self.community, author=self.author, title="T", content="C")
@@ -140,7 +150,7 @@ class DiscussionPostModerationTests(TestCase):
     def test_report_auto_flags_at_threshold(self):
         for i in range(5):
             reporter = User.objects.create_user(email=f"postreporter{i}@example.com", password="x", username=f"postreporter{i}")
-            profile = UserProfile.objects.create(user=reporter, current_status="working_professional")
+            profile = UserProfile.objects.create(user=reporter, current_status="working_professional", highest_education="pg")
             sync_memberships(profile)
             client = APIClient()
             client.force_authenticate(user=reporter)

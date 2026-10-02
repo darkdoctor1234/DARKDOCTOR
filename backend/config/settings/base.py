@@ -100,11 +100,17 @@ DATABASES = {
 
 AUTH_USER_MODEL = "accounts.User"
 
+# Client's published policy: min 6 characters, at least 1 uppercase, 1
+# lowercase, and 1 number-or-special-character. MinimumLengthValidator's
+# default is 8 — overridden to 6 here; PasswordComplexityValidator covers the
+# rest. NumericPasswordValidator is redundant once complexity requires
+# letters too, but left in as a harmless extra guard.
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 6}},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+    {"NAME": "modules.authentication.validators.PasswordComplexityValidator"},
 ]
 
 LANGUAGE_CODE = "en-us"

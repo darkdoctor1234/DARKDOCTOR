@@ -7,11 +7,12 @@ import { profileApi, STATUS_OPTIONS, type StatusValue, type UserProfile, UG_YEAR
 import { collegeApi, type College } from "@/lib/collegeApi";
 import { DEPARTMENT_GROUPS } from "@/lib/departments";
 import { authApi } from "@/lib/api";
-import { saveSession, getAccessToken, getRefreshToken, getUser, isAuthenticated, FEED_PREFS_KEY } from "@/lib/auth";
+import { saveSession, getAccessToken, getRefreshToken, getUser, isAuthenticated, clearSession, FEED_PREFS_KEY } from "@/lib/auth";
 import EmailVerifyModal from "@/components/EmailVerifyModal";
 import CollegeChangeRequestModal from "@/components/CollegeChangeRequestModal";
 import { collegeChangeApi, type CollegeField, type CollegeChangeRequestItem } from "@/lib/collegeChangeApi";
 import { matchesQuery } from "@/lib/search";
+import DeleteAccountModal from "@/components/DeleteAccountModal";
 
 function collegeFields(status: StatusValue, edu: "ug" | "pg" | "") {
   switch (status) {
@@ -246,6 +247,7 @@ export default function SettingsPage() {
   const [email,          setEmail]          = useState("");
   const [emailVerified,  setEmailVerified]  = useState(false);
   const [verifyOpen,     setVerifyOpen]     = useState(false);
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   // Guards against the initial profile fetch (which can still be in flight
   // alongside the slower colleges fetch) overwriting a verification the user
   // just completed with the stale pre-verification value.
@@ -260,6 +262,7 @@ export default function SettingsPage() {
   const [changeRequestField, setChangeRequestField] = useState<CollegeField | null>(null);
   const [pgDepartment,   setPgDepartment]   = useState("");
   const [batch,          setBatch]          = useState("");
+  const [pgBatch,        setPgBatch]        = useState("");
   const [yearOfStudy,    setYearOfStudy]    = useState<YearOfStudyValue>("");
   const [phone,          setPhone]          = useState("");
   const [address,        setAddress]        = useState("");
@@ -270,7 +273,17 @@ export default function SettingsPage() {
   useEffect(() => () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); }, []);
 
   const { showUg, showPg, needsEdu } = collegeFields(status, highestEdu);
-  const needsBatch = status === "ug_student" || status === "pg_student" || status === "alumni";
+  // `batch` (UG year) / `pg_batch` (PG year) each mean "year joined" while
+  // still pursuing that level, or "year completed" once finished — see
+  // signup/page.tsx's matching logic (kept in sync with this).
+  const needsBatch = status === "ug_student" || status === "pg_aspirant" || status === "pg_student"
+    || status === "working_professional" || status === "alumni" || status === "faculty";
+  const needsPgBatch = status === "pg_student"
+    || ((status === "working_professional" || status === "alumni" || status === "faculty") && highestEdu === "pg");
+  const isPursuingUg = status === "ug_student";
+  const isPursuingPg = status === "pg_student";
+  const batchLabel   = isPursuingUg ? "year you joined" : "year you completed UG";
+  const pgBatchLabel = isPursuingPg ? "year you joined" : "year you completed PG";
   const showYearOfStudy = status === "ug_student" || status === "pg_student";
   const yearOptions = status === "pg_student" ? PG_YEAR_OPTIONS : UG_YEAR_OPTIONS;
   const ugColleges = colleges.filter((c) => c.is_ug);
@@ -286,7 +299,7 @@ export default function SettingsPage() {
     setUgCollege(p.ug_college ?? null); setPgCollege(p.pg_college ?? null);
     setUgCollegeLocked(!!p.ug_college_locked); setPgCollegeLocked(!!p.pg_college_locked);
     setPgDepartment(p.pg_department ?? "");
-    setBatch(p.batch ?? "");
+    setBatch(p.batch ?? ""); setPgBatch(p.pg_batch ?? "");
     setYearOfStudy((p.year_of_study as YearOfStudyValue) ?? "");
     setPhone(p.phone ?? ""); setAddress(p.address ?? "");
   }, []);
@@ -333,6 +346,11 @@ export default function SettingsPage() {
   function handleStatusChange(v: StatusValue) { setStatus(v); setHighestEdu(""); setUgCollege(null); setPgCollege(null); setBatch(""); setYearOfStudy(""); }
   function handleEduChange(v: "ug" | "pg") { setHighestEdu(v); if (v === "ug") setPgCollege(null); }
 
+  async function handleLogout() {
+    try { await authApi.logout(getRefreshToken()!, getAccessToken()!); } catch {}
+    finally { clearSession(); router.replace("/"); }
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (saving) return;
@@ -344,7 +362,8 @@ export default function SettingsPage() {
     if (usernameStatus === "checking") { setError("Please wait, checking username…"); return; }
     if (!email.trim()) { setError("Email address is required."); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError("Please enter a valid email address."); return; }
-    if (needsBatch && !batch.trim()) { setError("Please enter your batch year."); return; }
+    if (needsBatch && !batch.trim()) { setError(isPursuingUg ? "Please enter the year you joined." : "Please enter the year you completed UG."); return; }
+    if (needsPgBatch && !pgBatch.trim()) { setError(isPursuingPg ? "Please enter the year you joined PG." : "Please enter the year you completed PG."); return; }
     setSaving(true); setSaveLabel("saving");
     const payload = {
       full_name: fullName.trim(), email: email.trim(),
@@ -354,6 +373,7 @@ export default function SettingsPage() {
       pg_college: showPg ? (pgCollege ?? null) : null,
       pg_department: showPg ? pgDepartment : "",
       batch: needsBatch ? batch.trim() : "",
+      pg_batch: needsPgBatch ? pgBatch.trim() : "",
       year_of_study: showYearOfStudy ? yearOfStudy : "",
       phone: phone.trim(), address: address.trim(),
     };
@@ -399,7 +419,8 @@ export default function SettingsPage() {
     { label: "UG college",     done: showUg ? !!ugCollege : true, weight: showUg ? 20 : 0 },
     { label: "PG college",     done: showPg ? !!pgCollege : true, weight: showPg ? 10 : 0 },
     { label: "PG specialty",   done: showPg ? !!pgDepartment : true, weight: showPg ? 10 : 0 },
-    { label: "Batch year",     done: needsBatch ? !!batch.trim() : true, weight: needsBatch ? 10 : 0 },
+    { label: "UG year",        done: needsBatch ? !!batch.trim() : true, weight: needsBatch ? 10 : 0 },
+    { label: "PG year",        done: needsPgBatch ? !!pgBatch.trim() : true, weight: needsPgBatch ? 10 : 0 },
     { label: "Phone",          done: !!phone.trim(),     weight: 5  },
     { label: "Address",        done: !!address.trim(),   weight: 5  },
   ];
@@ -589,13 +610,20 @@ export default function SettingsPage() {
 
             {needsBatch && (
               <div style={{ marginTop: "18px", paddingTop: "16px", borderTop: "1px solid var(--dd-border)" }}>
-                <Label>Batch <span style={{ fontWeight: 400, color: "var(--dd-text4)" }}>(year you joined)</span></Label>
+                <Label>UG Year <span style={{ fontWeight: 400, color: "var(--dd-text4)" }}>({batchLabel})</span></Label>
                 <Input id="settings-batch" value={batch} onChange={setBatch} placeholder="e.g. 2016" />
               </div>
             )}
 
-            {showYearOfStudy && (
+            {needsPgBatch && (
               <div style={{ marginTop: "18px", paddingTop: needsBatch ? "0" : "16px", borderTop: needsBatch ? "none" : "1px solid var(--dd-border)" }}>
+                <Label>PG Year <span style={{ fontWeight: 400, color: "var(--dd-text4)" }}>({pgBatchLabel})</span></Label>
+                <Input id="settings-pg-batch" value={pgBatch} onChange={setPgBatch} placeholder="e.g. 2020" />
+              </div>
+            )}
+
+            {showYearOfStudy && (
+              <div style={{ marginTop: "18px", paddingTop: (needsBatch || needsPgBatch) ? "0" : "16px", borderTop: (needsBatch || needsPgBatch) ? "none" : "1px solid var(--dd-border)" }}>
                 <Label>Year of Study <span style={{ fontWeight: 400, color: "var(--dd-text4)" }}>(optional)</span></Label>
                 <div style={{ position: "relative" }}>
                   <select
@@ -644,6 +672,35 @@ export default function SettingsPage() {
             </button>
           </div>
         </form>
+
+        <div style={{ textAlign: "center", marginTop: "28px", display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
+          <button
+            type="button"
+            onClick={handleLogout}
+            style={{
+              background: "none", border: "none", padding: "8px",
+              color: "var(--dd-text4)", fontSize: "0.8125rem", cursor: "pointer",
+              transition: "color 0.15s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--dd-danger)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--dd-text4)"; }}
+          >
+            Sign out
+          </button>
+          <button
+            type="button"
+            onClick={() => setDeleteAccountOpen(true)}
+            style={{
+              background: "none", border: "none", padding: "4px 8px",
+              color: "var(--dd-text4)", fontSize: "0.75rem", cursor: "pointer", opacity: 0.7,
+              transition: "color 0.15s, opacity 0.15s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--dd-danger)"; e.currentTarget.style.opacity = "1"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--dd-text4)"; e.currentTarget.style.opacity = "0.7"; }}
+          >
+            Delete account
+          </button>
+        </div>
       </main>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes pulse { 0%,100%{opacity:.4} 50%{opacity:.7} }`}</style>
@@ -668,6 +725,12 @@ export default function SettingsPage() {
           }}
         />
       )}
+
+      <DeleteAccountModal
+        open={deleteAccountOpen}
+        onClose={() => setDeleteAccountOpen(false)}
+        onDeleted={() => { clearSession(); router.replace("/"); }}
+      />
     </UserShell>
   );
 }

@@ -5,6 +5,7 @@ from .views import (
     ForgotPasswordView, ResetPasswordView,
     UsernameCheckView, EmailCheckView, UpdateUsernameView,
     SendEmailVerificationView, VerifyEmailView,
+    SendSignupOtpView, VerifySignupOtpView,
 )
 
 urlpatterns = [
@@ -21,4 +22,6 @@ urlpatterns = [
     path("username/",          UpdateUsernameView.as_view(),  name="update-username"),
     path("email/send-verification/", SendEmailVerificationView.as_view(), name="send-email-verification"),
     path("email/verify/",            VerifyEmailView.as_view(),           name="verify-email"),
+    path("signup/send-otp/",   SendSignupOtpView.as_view(),   name="signup-send-otp"),
+    path("signup/verify-otp/", VerifySignupOtpView.as_view(), name="signup-verify-otp"),
 ]
