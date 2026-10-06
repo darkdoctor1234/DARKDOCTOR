@@ -141,6 +141,7 @@ export default function SignupPage() {
   const [highestEdu, setHighestEdu] = useState<"ug" | "pg" | "">("");
   const [ugCollege,  setUgCollege]  = useState<number | null>(null);
   const [pgCollege,  setPgCollege]  = useState<number | null>(null);
+  const [workCollege, setWorkCollege] = useState<number | null>(null);
   const [pgDepartment, setPgDepartment] = useState("");
   const [batch,      setBatch]      = useState("");
   const [pgBatch,    setPgBatch]    = useState("");
@@ -187,7 +188,7 @@ export default function SignupPage() {
   }, [step, colleges.length]);
 
   function handleStatusChange(v: StatusValue) {
-    setStatus(v); setHighestEdu(""); setUgCollege(null); setPgCollege(null); setBatch(""); setPgBatch("");
+    setStatus(v); setHighestEdu(""); setUgCollege(null); setPgCollege(null); setWorkCollege(null); setBatch(""); setPgBatch("");
   }
   function handleEduChange(v: "ug" | "pg") {
     setHighestEdu(v);
@@ -333,6 +334,7 @@ export default function SignupPage() {
         highest_education: (status && needsEdu ? highestEdu : "") || undefined,
         ug_college:        showUg ? ugCollege : null,
         pg_college:        showPg ? pgCollege : null,
+        work_college:      status === "faculty" ? workCollege : undefined,
         pg_department:     showPgDept ? pgDepartment : undefined,
         batch:             needsBatch ? batch.trim() : undefined,
         pg_batch:          needsPgBatch ? pgBatch.trim() : undefined,
@@ -647,6 +649,16 @@ export default function SignupPage() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {status === "faculty" && (
+                <div style={{ paddingTop: "14px", borderTop: "1px solid var(--dd-border)" }}>
+                  <Label>College Where You Work <span style={{ fontWeight: 400, color: "var(--dd-text4)" }}>(optional)</span></Label>
+                  <CollegeSelect colleges={colleges} value={workCollege} onChange={setWorkCollege} placeholder="Select your workplace college…" />
+                  <p style={{ fontSize: "0.75rem", color: "var(--dd-text4)", marginTop: "6px" }}>
+                    Lets you review the college you teach at, as Faculty. It locks shortly after you set it, so double-check it.
+                  </p>
                 </div>
               )}
 

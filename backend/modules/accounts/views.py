@@ -33,15 +33,16 @@ def _sync_community_memberships(profile):
         logger.exception("Community membership sync failed for profile id=%s", profile.pk)
 
 
-_COLLEGE_FIELD_LABEL = {"ug_college": "UG college", "pg_college": "PG college"}
+_COLLEGE_FIELD_LABEL = {"ug_college": "UG college", "pg_college": "PG college", "work_college": "workplace college"}
 
 
 def _check_college_lock(profile: UserProfile, data) -> dict:
-    """Returns a dict of field -> error message for any ug_college/pg_college
-    change in `data` that's blocked by UserProfile.is_college_locked. Empty
-    dict means the request is clear to proceed."""
+    """Returns a dict of field -> error message for any ug_college/pg_college/
+    work_college change in `data` that's blocked by
+    UserProfile.is_college_locked. Empty dict means the request is clear to
+    proceed."""
     errors = {}
-    for field in ("ug_college", "pg_college"):
+    for field in ("ug_college", "pg_college", "work_college"):
         if field not in data:
             continue
         raw = data.get(field)
@@ -56,7 +57,9 @@ def _check_college_lock(profile: UserProfile, data) -> dict:
     return errors
 
 
-def _bump_college_set_at(profile: UserProfile, old_ug: int | None, old_pg: int | None):
+def _bump_college_set_at(
+    profile: UserProfile, old_ug: int | None, old_pg: int | None, old_work: int | None = None,
+):
     """Call right after saving a profile update — starts a fresh grace window
     for any college field that actually changed."""
     update_fields = []
@@ -66,6 +69,9 @@ def _bump_college_set_at(profile: UserProfile, old_ug: int | None, old_pg: int |
     if profile.pg_college_id != old_pg:
         profile.pg_college_set_at = timezone.now()
         update_fields.append("pg_college_set_at")
+    if profile.work_college_id != old_work:
+        profile.work_college_set_at = timezone.now()
+        update_fields.append("work_college_set_at")
     if update_fields:
         profile.save(update_fields=update_fields)
 
@@ -281,9 +287,9 @@ class ProfileMeView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
 
-        old_ug, old_pg = profile.ug_college_id, profile.pg_college_id
+        old_ug, old_pg, old_work = profile.ug_college_id, profile.pg_college_id, profile.work_college_id
         profile = serializer.save()
-        _bump_college_set_at(profile, old_ug, old_pg)
+        _bump_college_set_at(profile, old_ug, old_pg, old_work)
         _sync_community_memberships(profile)
 
         user_fields = []
@@ -330,8 +336,11 @@ class CollegeChangeRequestCreateView(APIView):
             return Response({"detail": "Complete your profile first."}, status=400)
 
         field = request.data.get("field")
-        if field not in (CollegeChangeRequest.Field.UG, CollegeChangeRequest.Field.PG):
-            return Response({"field": "Must be 'ug_college' or 'pg_college'."}, status=400)
+        if field not in (CollegeChangeRequest.Field.UG, CollegeChangeRequest.Field.PG, CollegeChangeRequest.Field.WORK):
+            return Response({"field": "Must be 'ug_college', 'pg_college' or 'work_college'."}, status=400)
+
+        if field == CollegeChangeRequest.Field.WORK and profile.current_status != UserProfile.Status.FACULTY:
+            return Response({"field": "Only faculty have a workplace college."}, status=400)
 
         if CollegeChangeRequest.objects.filter(
             user=request.user, field=field, status=CollegeChangeRequest.Status.PENDING

@@ -366,24 +366,24 @@ class CollegeReviewListCreateView(APIView):
     def post(self, request, pk):
         college = get_object_or_404(College, pk=pk)
 
-        # Only allow users whose profile links to this college
+        # Only people who are studying or have studied here can review it —
+        # whatever their current status (student, alumni, working
+        # professional, faculty...). A college saved only as an aspirant's
+        # target doesn't count.
         try:
             profile = request.user.profile
-            allowed_ids = set(filter(None, [
-                profile.ug_college_id,
-                profile.pg_college_id,
-            ]))
+            roles = profile.review_roles()
         except Exception:
-            allowed_ids = set()
+            roles = {}
 
-        if not allowed_ids:
+        if not roles:
             return Response(
-                {"detail": "Complete your profile with your college before writing a review."},
+                {"detail": "Add the college you studied at (and your status) on your profile before writing a review."},
                 status=403,
             )
-        if college.id not in allowed_ids:
+        if college.id not in roles:
             return Response(
-                {"detail": "You can only review colleges you are affiliated with (your UG or PG college)."},
+                {"detail": "You can only review a college you are studying at, have studied at, or (for faculty) work at."},
                 status=403,
             )
 
@@ -414,6 +414,15 @@ class CollegeReviewListCreateView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
 
+        # The role is shown publicly on the review, so it has to be the one
+        # this user really holds at this college — not whatever the client
+        # claims (e.g. nobody can post themselves as faculty).
+        if serializer.validated_data["role"] != roles[college.id]:
+            return Response(
+                {"role": f"Your role at this college is '{roles[college.id]}'."},
+                status=400,
+            )
+
         review = serializer.save(college=college, user=request.user)
         return Response(
             ReviewSerializer(review, context={"request": request}).data,
@@ -435,6 +444,20 @@ class ReviewResubmitView(APIView):
         serializer = ReviewCreateSerializer(review, data=request.data, context={"request": request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
+
+        # Same rule as creating a review: the public role must be the one this
+        # user really holds at this college.
+        try:
+            expected_role = request.user.profile.review_roles().get(review.college_id)
+        except Exception:
+            expected_role = None
+        if expected_role is None:
+            return Response(
+                {"detail": "You can only review a college you are studying at, have studied at, or (for faculty) work at."},
+                status=403,
+            )
+        if serializer.validated_data["role"] != expected_role:
+            return Response({"role": f"Your role at this college is '{expected_role}'."}, status=400)
 
         review = serializer.save()
         return Response(ReviewSerializer(review, context={"request": request}).data)

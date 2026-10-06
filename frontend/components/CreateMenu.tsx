@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { isAuthenticated } from "@/lib/auth";
 import { profileApi } from "@/lib/profileApi";
+import { reviewableColleges, ReviewableCollege } from "@/lib/reviewEligibility";
 import AskQuestionModal from "@/components/colleges/AskQuestionModal";
 import WriteReviewModal from "@/components/colleges/WriteReviewModal";
 
@@ -62,6 +63,9 @@ export default function CreateMenu() {
   const [reviewTarget, setReviewTarget] = useState<{ id: number; name: string } | null>(null);
   const [checking, setChecking]     = useState(false);
   const [checkError, setCheckError] = useState("");
+  // Set when the user has more than one college they can review (e.g. UG and
+  // PG), so the sheet asks which one instead of silently picking for them.
+  const [reviewChoices, setReviewChoices] = useState<ReviewableCollege[] | null>(null);
 
   // The trigger buttons live inside the top <nav>, which sets
   // backdropFilter — a property that (like `filter`/`transform`) creates a
@@ -82,6 +86,7 @@ export default function CreateMenu() {
   function handleTrigger(e: React.MouseEvent) {
     if (!isAuthenticated()) { router.push("/login"); return; }
     setCheckError("");
+    setReviewChoices(null);
     openedAt.current = e.timeStamp;
     setSheetOpen(true);
   }
@@ -96,24 +101,28 @@ export default function CreateMenu() {
     if (action === "ask")     { setSheetOpen(false); setAskState({ kind: "question" }); return; }
     if (action === "discuss") { setSheetOpen(false); setAskState({ kind: "discussion" }); return; }
 
-    // "review" needs the user's own college resolved first — reviews are
-    // affiliation-gated, unlike Ask/Discuss, so there's no free picker.
+    // "review" is limited to colleges the user is studying at or has studied
+    // at (see lib/reviewEligibility.ts), unlike Ask/Discuss which have a free
+    // picker — so work out which of their colleges qualify first.
     setChecking(true);
     setCheckError("");
     try {
       const p = await profileApi.get();
-      // A PG Aspirant's pg_college is just their target college, not
-      // somewhere they've actually studied — only prefer pg_college when
-      // the status means it's real (currently attending, or completed).
-      const attendedPg  = p.current_status !== "pg_aspirant" && !!p.pg_college;
-      const collegeId   = attendedPg ? p.pg_college : p.ug_college;
-      const collegeName = attendedPg ? p.pg_college_name : p.ug_college_name;
-      if (!collegeId) {
-        setCheckError("Add your college on your profile first.");
+      const options = reviewableColleges(p);
+      if (options.length === 0) {
+        setCheckError(
+          p.ug_college || p.pg_college
+            ? "You can review colleges you're studying at or have studied at. A college you're only aiming for doesn't count yet."
+            : "Add your college on your profile first.",
+        );
+        return;
+      }
+      if (options.length > 1) {
+        setReviewChoices(options);
         return;
       }
       setSheetOpen(false);
-      setReviewTarget({ id: collegeId, name: collegeName || "Your College" });
+      setReviewTarget({ id: options[0].id, name: options[0].name });
     } catch {
       setCheckError("Couldn't check your profile. Try again.");
     } finally {
@@ -227,7 +236,7 @@ export default function CreateMenu() {
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
               <h2 style={{ fontFamily: "var(--font-serif)", fontSize: "1.05rem", fontWeight: 600, color: "var(--dd-text1)", letterSpacing: "-0.01em" }}>
-                Create
+                {reviewChoices ? "Which college?" : "Create"}
               </h2>
               <button onClick={() => setSheetOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--dd-text3)", padding: "4px" }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = "var(--dd-text1)"; }}
@@ -237,6 +246,32 @@ export default function CreateMenu() {
               </button>
             </div>
 
+            {reviewChoices ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {reviewChoices.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => { setSheetOpen(false); setReviewChoices(null); setReviewTarget({ id: c.id, name: c.name }); }}
+                    style={{
+                      display: "flex", flexDirection: "column", gap: "3px", textAlign: "left",
+                      padding: "14px", borderRadius: "14px", width: "100%", cursor: "pointer",
+                      background: "var(--dd-surface)", border: "1px solid var(--dd-border)",
+                    }}
+                  >
+                    <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--dd-text1)", lineHeight: 1.35 }}>{c.name}</span>
+                    <span style={{ fontSize: "0.78rem", color: "var(--dd-text3)" }}>
+                      {c.level === "Work" ? "Where you work" : c.level} · {c.role === "student" ? "Current student" : c.role === "faculty" ? "Faculty" : "Alumni"}{c.batchYear ? ` · ${c.batchYear}` : ""}
+                    </span>
+                  </button>
+                ))}
+                <button
+                  onClick={() => setReviewChoices(null)}
+                  style={{ marginTop: "4px", background: "none", border: "none", cursor: "pointer", color: "var(--dd-text3)", fontSize: "0.8125rem", padding: "6px" }}
+                >
+                  Back
+                </button>
+              </div>
+            ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {ACTIONS.map((a) => (
                 <button
@@ -262,6 +297,7 @@ export default function CreateMenu() {
                 </button>
               ))}
             </div>
+            )}
 
             {checkError && (
               <p style={{ marginTop: "12px", fontSize: "0.8125rem", color: "var(--dd-danger)", textAlign: "center" }}>{checkError}</p>

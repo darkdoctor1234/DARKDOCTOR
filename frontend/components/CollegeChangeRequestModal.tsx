@@ -68,7 +68,11 @@ export default function CollegeChangeRequestModal({ field, fieldLabel, colleges,
         </div>
 
         <p style={{ fontSize: "0.8125rem", color: "var(--dd-text3)", lineHeight: 1.6, marginBottom: "20px" }}>
-          To prevent misuse, changing your {fieldLabel} needs a document proving it (ID card, admission letter, bonafide certificate) and admin approval.
+          To prevent misuse, changing your {fieldLabel} needs a document proving it (
+          {field === "work_college"
+            ? "faculty ID card, appointment letter, experience certificate"
+            : "ID card, admission letter, bonafide certificate"}
+          ) and admin approval.
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>

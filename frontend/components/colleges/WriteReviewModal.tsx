@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { collegeApi, ReviewPayload, Review } from "@/lib/collegeApi";
 import { profileApi } from "@/lib/profileApi";
+import { reviewAffiliation, ReviewerRole } from "@/lib/reviewEligibility";
 import { DEPARTMENT_GROUPS } from "@/lib/departments";
 
 function DeptSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -158,8 +159,6 @@ function StarRating({ value, onChange }: { value: number; onChange: (v: number) 
 }
 
 /** Reviewer identity is derived from the signed-in user's profile — not re-asked per review. */
-type ReviewerRole = "student" | "alumni";
-
 const ROLE_META: Record<ReviewerRole, { label: string; icon: React.ReactNode }> = {
   student: {
     label: "Current Student",
@@ -177,31 +176,15 @@ const ROLE_META: Record<ReviewerRole, { label: string; icon: React.ReactNode }> 
       </svg>
     ),
   },
+  faculty: {
+    label: "Faculty",
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/>
+      </svg>
+    ),
+  },
 };
-
-function deriveRole(status: string): ReviewerRole | null {
-  if (status === "ug_student" || status === "pg_student") return "student";
-  if (status === "alumni") return "alumni";
-  return null;
-}
-
-/** `batch` is always the UG year and `pg_batch` the PG year, so a review's
- *  year/role must follow whichever college is actually being reviewed — not
- *  just blindly use the UG year. Where the same college is both the UG and PG
- *  college, the PG affiliation (the more recent one) wins. A PG student
- *  reviewing their UG college has finished there, so they review as alumni. */
-function deriveAffiliation(
-  p: { current_status: string; ug_college: number | null; pg_college: number | null; batch: string; pg_batch: string },
-  collegeId: number,
-): { role: ReviewerRole | null; batchYear: string } {
-  const isPg = p.current_status !== "pg_aspirant" && p.pg_college === collegeId;
-  if (isPg) return { role: deriveRole(p.current_status), batchYear: p.pg_batch || "" };
-
-  const role = p.current_status === "pg_student" && p.ug_college === collegeId
-    ? "alumni"
-    : deriveRole(p.current_status);
-  return { role, batchYear: p.batch || "" };
-}
 
 export default function WriteReviewModal({ collegeId, collegeName, onClose, onSubmitted }: Props) {
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -237,9 +220,9 @@ export default function WriteReviewModal({ collegeId, collegeName, onClose, onSu
       collegeApi.myReviews().catch(() => []),
     ])
       .then(([p, myReviews]) => {
-        const affiliation = deriveAffiliation(p, collegeId);
-        setRole(affiliation.role);
-        setBatchYear(affiliation.batchYear);
+        const affiliation = reviewAffiliation(p, collegeId);
+        setRole(affiliation?.role ?? null);
+        setBatchYear(affiliation?.batchYear ?? "");
 
         const existing = myReviews.find((r) => r.college === collegeId) ?? null;
         setExistingReview(existing);
@@ -282,7 +265,8 @@ export default function WriteReviewModal({ collegeId, collegeName, onClose, onSu
     e.preventDefault();
     setError("");
 
-    if (!role) return setError("Please complete your profile status before writing a review.");
+    if (!role) return setError("You can only review a college you are studying at or have studied at.");
+    if (role !== "faculty" && !batchYear) return setError("Please add your year for this college on your profile first.");
     if (scope === "department" && !dept) return setError("Please select a department, or switch to Whole College.");
     if (!title.trim())   return setError("Please enter a title.");
     if (!content.trim()) return setError("Please write your review.");
@@ -370,8 +354,10 @@ export default function WriteReviewModal({ collegeId, collegeName, onClose, onSu
         ) : !role ? (
           <div style={{ textAlign: "center", padding: "12px 0 4px" }}>
             <p style={{ color: "var(--dd-text2)", fontSize: "0.9rem", lineHeight: 1.6, marginBottom: "20px" }}>
-              To write a review, set your current status to <strong style={{ color: "var(--dd-text1)" }}>Student</strong> or{" "}
-              <strong style={{ color: "var(--dd-text1)" }}>Alumni</strong> in your profile first.
+              You can review a college you are <strong style={{ color: "var(--dd-text1)" }}>studying at</strong> or{" "}
+              <strong style={{ color: "var(--dd-text1)" }}>have studied at</strong> — your UG or PG college — or, for
+              faculty, the college you <strong style={{ color: "var(--dd-text1)" }}>work at</strong>.
+              A college you&apos;re only aiming for, or one that isn&apos;t on your profile, doesn&apos;t count yet.
             </p>
             <a
               href="/profile"

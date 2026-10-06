@@ -142,12 +142,23 @@ class UserProfile(models.Model):
         null=True, blank=True,
         related_name="pg_profiles",
     )
+    # Faculty only: the college they currently work at, which may differ from
+    # where they studied. Lets them review it (as "faculty") alongside their
+    # UG/PG colleges. Locked and changed exactly like those two — see
+    # is_college_locked and CollegeChangeRequest.
+    work_college = models.ForeignKey(
+        "colleges.College",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="work_profiles",
+    )
     # When each college field was last freely set (initial set, or an
     # admin-approved change) — anchors the self-correction grace window in
     # is_college_locked. Left null for rows that predate this feature, which
     # is deliberately treated as "already locked" (see is_college_locked).
     ug_college_set_at = models.DateTimeField(null=True, blank=True)
     pg_college_set_at = models.DateTimeField(null=True, blank=True)
+    work_college_set_at = models.DateTimeField(null=True, blank=True)
     pg_department = models.CharField(
         max_length=100, blank=True, default="", choices=PG_DEPARTMENT_CHOICES,
         help_text="Self-reported PG specialty — drives which Specialty Communities this profile is auto-joined to.",
@@ -217,8 +228,35 @@ class UserProfile(models.Model):
             return self.highest_education == self.Education.PG
         return False
 
+    def review_roles(self) -> dict[int, str]:
+        """college id -> the role this user reviews that college as
+        ("student", "alumni" or "faculty"), for every college they may review:
+        ones they are studying at or have studied at, plus (for faculty) the
+        college they work at. An aspirant's saved college is just a *target*
+        (see the UG/PG aspirant statuses), not somewhere they've been, so it
+        doesn't count. Where one college is several of these, the most
+        specific wins: workplace over PG over UG. Mirrors reviewAffiliation()
+        in frontend/lib/reviewEligibility.ts — keep the two in sync.
+        """
+        S = self.Status
+        roles: dict[int, str] = {}
+        if self.ug_college_id and self.current_status in (
+            S.UG_STUDENT, S.PG_ASPIRANT, S.PG_STUDENT, S.WORKING_PROFESSIONAL, S.ALUMNI, S.FACULTY,
+        ):
+            roles[self.ug_college_id] = "student" if self.current_status == S.UG_STUDENT else "alumni"
+        if self.pg_college_id and self.current_status in (
+            S.PG_STUDENT, S.WORKING_PROFESSIONAL, S.ALUMNI, S.FACULTY,
+        ):
+            roles[self.pg_college_id] = "student" if self.current_status == S.PG_STUDENT else "alumni"
+        if self.work_college_id and self.current_status == S.FACULTY:
+            roles[self.work_college_id] = "faculty"
+        return roles
+
+    def reviewable_college_ids(self) -> set[int]:
+        return set(self.review_roles())
+
     def is_college_locked(self, field: str) -> bool:
-        """Whether `field` ("ug_college" or "pg_college") can no longer be
+        """Whether `field` ("ug_college", "pg_college" or "work_college") can no longer be
         self-edited from Settings and needs a CollegeChangeRequest instead.
 
         Setting a currently-empty field is always free (that's the normal UG
@@ -257,12 +295,14 @@ PROOF_ALLOWED_CONTENT_TYPES = {
 
 
 class CollegeChangeRequest(models.Model):
-    """A user's request to change an already-locked ug_college/pg_college,
-    with proof, reviewed by an admin — see UserProfile.is_college_locked."""
+    """A user's request to change an already-locked ug_college/pg_college/
+    work_college, with proof, reviewed by an admin — see
+    UserProfile.is_college_locked."""
 
     class Field(models.TextChoices):
         UG = "ug_college", "UG College"
         PG = "pg_college", "PG College"
+        WORK = "work_college", "Workplace College"
 
     class Status(models.TextChoices):
         PENDING  = "pending",  "Pending Review"
@@ -270,7 +310,7 @@ class CollegeChangeRequest(models.Model):
         REJECTED = "rejected", "Rejected"
 
     user   = models.ForeignKey(User, on_delete=models.CASCADE, related_name="college_change_requests")
-    field  = models.CharField(max_length=10, choices=Field.choices)
+    field  = models.CharField(max_length=20, choices=Field.choices)
     current_college = models.ForeignKey(
         "colleges.College", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
     )

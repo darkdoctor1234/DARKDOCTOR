@@ -329,3 +329,101 @@ class AdminPasswordStrengthTests(TestCase):
             "full_name": "Existing Admin", "email": "existing2@example.com", "password": "12345678",
         }, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class FacultyWorkCollegeTests(TestCase):
+    """Faculty's workplace college: the third college field. It follows the
+    exact same lock / change-request rules as UG and PG, but is faculty-only
+    and makes that college reviewable."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(email="faculty@example.com", password="x", username="facultyuser")
+        self.client.force_authenticate(user=self.user)
+        self.ug = make_college("Faculty UG College")
+        self.work = make_college("Faculty Workplace College")
+        self.other = make_college("Some Other College")
+
+    def _faculty_profile(self, **extra):
+        return UserProfile.objects.create(
+            user=self.user, current_status="faculty", highest_education="ug", batch="2005",
+            ug_college=self.ug, **extra,
+        )
+
+    def test_work_college_locks_like_ug_and_pg(self):
+        profile = self._faculty_profile(work_college=self.work)
+        self.assertTrue(profile.is_college_locked("work_college"))  # no set_at -> legacy -> locked
+        profile.work_college_set_at = timezone.now()
+        self.assertFalse(profile.is_college_locked("work_college"))
+        profile.work_college_set_at = timezone.now() - COLLEGE_EDIT_GRACE_PERIOD - timedelta(hours=1)
+        self.assertTrue(profile.is_college_locked("work_college"))
+
+    def test_faculty_can_set_work_college_and_it_starts_a_grace_window(self):
+        self._faculty_profile()
+        response = self.client.patch("/api/v1/accounts/profile/me/", {"work_college": self.work.id}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["work_college"], self.work.id)
+        self.assertFalse(response.data["work_college_locked"])
+        self.assertIsNotNone(UserProfile.objects.get(user=self.user).work_college_set_at)
+
+    def test_non_faculty_cannot_set_work_college(self):
+        UserProfile.objects.create(
+            user=self.user, current_status="alumni", highest_education="ug", batch="2005", ug_college=self.ug,
+        )
+        response = self.client.patch("/api/v1/accounts/profile/me/", {"work_college": self.work.id}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("work_college", response.data)
+
+    def test_locked_work_college_cannot_be_changed_directly(self):
+        self._faculty_profile(
+            work_college=self.work,
+            work_college_set_at=timezone.now() - COLLEGE_EDIT_GRACE_PERIOD - timedelta(hours=1),
+        )
+        response = self.client.patch("/api/v1/accounts/profile/me/", {"work_college": self.other.id}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(UserProfile.objects.get(user=self.user).work_college_id, self.work.id)
+
+    def test_locked_work_college_change_goes_through_a_request_and_admin_approval(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        profile = self._faculty_profile(
+            work_college=self.work,
+            work_college_set_at=timezone.now() - COLLEGE_EDIT_GRACE_PERIOD - timedelta(hours=1),
+        )
+        proof = SimpleUploadedFile("proof.pdf", b"%PDF-1.4 fake but valid-looking", content_type="application/pdf")
+        response = self.client.post(
+            "/api/v1/accounts/college-change-requests/",
+            {"field": "work_college", "requested_college": self.other.id, "proof": proof}, format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        admin = User.objects.create_user(email="adm@example.com", password="x", username="adm", role=User.Role.ADMIN)
+        admin_client = APIClient()
+        admin_client.force_authenticate(user=admin)
+        change_request = CollegeChangeRequest.objects.get(user=self.user)
+        response = admin_client.patch(
+            f"/api/v1/accounts/college-change-requests/{change_request.id}/admin/", {"action": "approve"}, format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        profile.refresh_from_db()
+        self.assertEqual(profile.work_college_id, self.other.id)
+
+    def test_non_faculty_cannot_request_a_work_college_change(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        UserProfile.objects.create(user=self.user, current_status="alumni", highest_education="ug", batch="2005", ug_college=self.ug)
+        proof = SimpleUploadedFile("proof.pdf", b"%PDF-1.4 fake", content_type="application/pdf")
+        response = self.client.post(
+            "/api/v1/accounts/college-change-requests/",
+            {"field": "work_college", "requested_college": self.other.id, "proof": proof}, format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_only_faculty_can_review_their_work_college(self):
+        profile = self._faculty_profile(work_college=self.work)
+        self.assertEqual(profile.reviewable_college_ids(), {self.ug.id, self.work.id})
+        profile.current_status = "alumni"
+        self.assertEqual(profile.reviewable_college_ids(), {self.ug.id})
+
+    def test_login_payload_carries_work_college(self):
+        from modules.authentication.views import build_user_payload
+        self._faculty_profile(work_college=self.work)
+        self.assertEqual(build_user_payload(self.user)["work_college"], self.work.id)

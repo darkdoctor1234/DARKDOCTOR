@@ -193,6 +193,41 @@ class RegistrationTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
 
+    def test_register_faculty_can_set_a_workplace_college(self):
+        work = make_college("Faculty Workplace College")
+        payload = {
+            **self.valid_payload, "current_status": "faculty", "highest_education": "ug",
+            "batch": "2005", "work_college": work.id,
+        }
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        profile = User.objects.get(email="asha@example.com").profile
+        self.assertEqual(profile.work_college_id, work.id)
+        # Starts the grace window, so a typo'd workplace can be fixed without proof.
+        self.assertIsNotNone(profile.work_college_set_at)
+        self.assertFalse(profile.is_college_locked("work_college"))
+
+    def test_register_workplace_is_optional_for_faculty(self):
+        payload = {**self.valid_payload, "current_status": "faculty", "highest_education": "ug", "batch": "2005"}
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(User.objects.get(email="asha@example.com").profile.work_college_id)
+
+    def test_register_rejects_workplace_for_non_faculty(self):
+        payload = {**self.valid_payload, "work_college": make_college("Not Faculty College").id}
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("work_college", response.data)
+
+    def test_register_rejects_a_nonexistent_workplace_college(self):
+        payload = {
+            **self.valid_payload, "current_status": "faculty", "highest_education": "ug",
+            "batch": "2005", "work_college": 999999,
+        }
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
 class SignupOtpGateTests(TestCase):
     """SendSignupOtpView / VerifySignupOtpView — the pre-signup email
     verification gate that RegisterSerializer.validate() enforces (see

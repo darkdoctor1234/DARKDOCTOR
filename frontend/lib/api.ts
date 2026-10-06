@@ -56,6 +56,7 @@ interface RegisterPayload {
   highest_education?: string;
   ug_college?:        number | null;
   pg_college?:        number | null;
+  work_college?:      number | null;
   pg_department?:     string;
   batch?:             string;
   pg_batch?:          string;
