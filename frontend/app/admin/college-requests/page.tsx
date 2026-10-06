@@ -103,7 +103,7 @@ export default function AdminCollegeRequestsPage() {
             College Change Requests
           </h1>
           <p style={{ fontSize: "0.875rem", color: "var(--dd-text3)" }}>
-            A user's UG/PG college locks after their first review or a short grace window. Changing it after that needs proof, reviewed here.
+            A user's UG/PG (or faculty workplace) college locks after their first review or a short grace window. Changing it after that needs proof, reviewed here.
           </p>
         </div>
 

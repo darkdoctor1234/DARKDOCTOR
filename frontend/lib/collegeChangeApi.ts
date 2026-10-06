@@ -2,7 +2,7 @@ import { getAccessToken } from "./auth";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
-export type CollegeField = "ug_college" | "pg_college";
+export type CollegeField = "ug_college" | "pg_college" | "work_college";
 
 export interface CollegeChangeRequestItem {
   id: number;

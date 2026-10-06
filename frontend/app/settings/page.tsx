@@ -258,6 +258,8 @@ export default function SettingsPage() {
   const [pgCollege,      setPgCollege]      = useState<number | null>(null);
   const [ugCollegeLocked, setUgCollegeLocked] = useState(false);
   const [pgCollegeLocked, setPgCollegeLocked] = useState(false);
+  const [workCollege,    setWorkCollege]    = useState<number | null>(null);
+  const [workCollegeLocked, setWorkCollegeLocked] = useState(false);
   const [pendingChangeFields, setPendingChangeFields] = useState<Set<CollegeField>>(new Set());
   const [changeRequestField, setChangeRequestField] = useState<CollegeField | null>(null);
   const [pgDepartment,   setPgDepartment]   = useState("");
@@ -298,6 +300,7 @@ export default function SettingsPage() {
     setHighestEdu((p.highest_education as "ug" | "pg" | "") ?? "");
     setUgCollege(p.ug_college ?? null); setPgCollege(p.pg_college ?? null);
     setUgCollegeLocked(!!p.ug_college_locked); setPgCollegeLocked(!!p.pg_college_locked);
+    setWorkCollege(p.work_college ?? null); setWorkCollegeLocked(!!p.work_college_locked);
     setPgDepartment(p.pg_department ?? "");
     setBatch(p.batch ?? ""); setPgBatch(p.pg_batch ?? "");
     setYearOfStudy((p.year_of_study as YearOfStudyValue) ?? "");
@@ -371,6 +374,9 @@ export default function SettingsPage() {
       highest_education: needsEdu ? (highestEdu || undefined) : undefined,
       ug_college: showUg ? (ugCollege ?? null) : null,
       pg_college: showPg ? (pgCollege ?? null) : null,
+      // Faculty only. Left out entirely (not nulled) for everyone else so a
+      // locked workplace isn't treated as an attempted change.
+      work_college: status === "faculty" ? (workCollege ?? null) : undefined,
       pg_department: showPg ? pgDepartment : "",
       batch: needsBatch ? batch.trim() : "",
       pg_batch: needsPgBatch ? pgBatch.trim() : "",
@@ -386,7 +392,7 @@ export default function SettingsPage() {
       fillForm(updated); setUsername(trimmedUsername);
       const accessToken = getAccessToken(); const refreshToken = getRefreshToken();
       const session = getUser<{ email: string; full_name: string; role: string }>();
-      if (session && accessToken && refreshToken) saveSession(accessToken, refreshToken, { ...session, full_name: updated.full_name, email: updated.email, email_verified: updated.email_verified, ug_college: updated.ug_college ?? null, pg_college: updated.pg_college ?? null });
+      if (session && accessToken && refreshToken) saveSession(accessToken, refreshToken, { ...session, full_name: updated.full_name, email: updated.email, email_verified: updated.email_verified, ug_college: updated.ug_college ?? null, pg_college: updated.pg_college ?? null, work_college: updated.work_college ?? null });
       if (updated.current_status) {
         sessionStorage.setItem(FEED_PREFS_KEY, JSON.stringify({ status: updated.current_status, highestEdu: updated.highest_education || "", ugCollege: updated.ug_college ?? null, pgCollege: updated.pg_college ?? null }));
       } else { sessionStorage.removeItem(FEED_PREFS_KEY); }
@@ -608,6 +614,24 @@ export default function SettingsPage() {
               </div>
             )}
 
+            {status === "faculty" && (
+              <div style={{ marginTop: "18px", paddingTop: "16px", borderTop: "1px solid var(--dd-border)" }}>
+                {workCollegeLocked ? (
+                  <LockedCollegeField
+                    label="College Where You Work"
+                    collegeName={colleges.find((c) => c.id === workCollege)?.name ?? null}
+                    pending={pendingChangeFields.has("work_college")}
+                    onRequestChange={() => setChangeRequestField("work_college")}
+                  />
+                ) : (
+                  <CollegeSelect colleges={colleges} value={workCollege} onChange={setWorkCollege} label="College Where You Work" placeholder="Select your workplace college…" />
+                )}
+                <p style={{ fontSize: "0.75rem", color: "var(--dd-text4)", marginTop: "6px" }}>
+                  Optional. Lets you review the college you teach at, as Faculty. Like your UG and PG colleges, it locks shortly after you set it.
+                </p>
+              </div>
+            )}
+
             {needsBatch && (
               <div style={{ marginTop: "18px", paddingTop: "16px", borderTop: "1px solid var(--dd-border)" }}>
                 <Label>UG Year <span style={{ fontWeight: 400, color: "var(--dd-text4)" }}>({batchLabel})</span></Label>
@@ -716,8 +740,8 @@ export default function SettingsPage() {
       {changeRequestField && (
         <CollegeChangeRequestModal
           field={changeRequestField}
-          fieldLabel={changeRequestField === "ug_college" ? "UG college" : "PG college"}
-          colleges={changeRequestField === "ug_college" ? ugColleges : pgColleges}
+          fieldLabel={changeRequestField === "ug_college" ? "UG college" : changeRequestField === "pg_college" ? "PG college" : "workplace college"}
+          colleges={changeRequestField === "ug_college" ? ugColleges : changeRequestField === "pg_college" ? pgColleges : colleges}
           onClose={() => setChangeRequestField(null)}
           onSubmitted={() => {
             setPendingChangeFields((prev) => new Set(prev).add(changeRequestField));

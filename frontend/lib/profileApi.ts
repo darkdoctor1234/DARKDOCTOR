@@ -55,6 +55,10 @@ export interface UserProfile {
   pg_college_name:   string | null;
   ug_college_locked?: boolean;
   pg_college_locked?: boolean;
+  /** Faculty only — the college they currently work at. */
+  work_college:      number | null;
+  work_college_name: string | null;
+  work_college_locked?: boolean;
   pg_department:     string;
   batch:             string;
   pg_batch:          string;
@@ -105,6 +109,7 @@ export interface ProfilePayload {
   highest_education?: string;
   ug_college?:        number | null;
   pg_college?:        number | null;
+  work_college?:      number | null;
   pg_department?:     string;
   batch?:             string;
   pg_batch?:          string;

@@ -137,6 +137,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
     pg_college_name   = serializers.SerializerMethodField()
     ug_college_locked = serializers.SerializerMethodField()
     pg_college_locked = serializers.SerializerMethodField()
+    work_college_name   = serializers.SerializerMethodField()
+    work_college_locked = serializers.SerializerMethodField()
 
     class Meta:
         model = UserProfile
@@ -152,6 +154,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "pg_college",
             "pg_college_name",
             "pg_college_locked",
+            "work_college",
+            "work_college_name",
+            "work_college_locked",
             "pg_department",
             "batch",
             "pg_batch",
@@ -163,8 +168,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "email", "full_name", "username",
-            "ug_college_name", "pg_college_name",
-            "ug_college_locked", "pg_college_locked",
+            "ug_college_name", "pg_college_name", "work_college_name",
+            "ug_college_locked", "pg_college_locked", "work_college_locked",
             "created_at", "updated_at",
         ]
 
@@ -179,6 +184,12 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def get_pg_college_locked(self, obj):
         return obj.is_college_locked("pg_college")
+
+    def get_work_college_name(self, obj):
+        return obj.work_college.name if obj.work_college else None
+
+    def get_work_college_locked(self, obj):
+        return obj.is_college_locked("work_college")
 
     def validate(self, attrs):
         # `batch` (the UG year) and `pg_batch` (the PG year) each mean either
@@ -227,6 +238,11 @@ class UserProfileSerializer(serializers.ModelSerializer):
         )
         if is_eligible and not str(pg_department).strip():
             raise serializers.ValidationError({"pg_department": "PG specialty is required for this status."})
+
+        # Only faculty have a workplace college. An explicit null is always
+        # fine (clearing it); setting one while not faculty is not.
+        if attrs.get("work_college") and status != UserProfile.Status.FACULTY:
+            raise serializers.ValidationError({"work_college": "Only faculty can set a workplace college."})
         return attrs
 
 

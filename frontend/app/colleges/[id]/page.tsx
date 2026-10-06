@@ -17,7 +17,7 @@ import AskQuestionModal from "@/components/colleges/AskQuestionModal";
 import { questionsApi, type Question, type QuestionKind } from "@/lib/questionsApi";
 import { ALL_DEPARTMENTS } from "@/lib/departments";
 
-interface SessionUser { id: number; email: string; full_name: string; role: string; ug_college: number | null; pg_college: number | null; }
+interface SessionUser { id: number; email: string; full_name: string; role: string; ug_college: number | null; pg_college: number | null; work_college?: number | null; }
 
 function inr(amount: number): string {
   return "₹" + amount.toLocaleString("en-IN");
@@ -116,10 +116,10 @@ export default function CollegeDetailPage() {
     if (!session) return;
     setUser(session);
     // If college affiliations are missing from the session (stale token), refresh from API
-    if (session.ug_college == null && session.pg_college == null) {
+    if (session.ug_college == null && session.pg_college == null && session.work_college == null) {
       profileApi.get().then((p) => {
-        if (p.ug_college != null || p.pg_college != null) {
-          const updated = { ...session, ug_college: p.ug_college, pg_college: p.pg_college };
+        if (p.ug_college != null || p.pg_college != null || p.work_college != null) {
+          const updated = { ...session, ug_college: p.ug_college, pg_college: p.pg_college, work_college: p.work_college };
           setUser(updated);
           const access = getAccessToken(); const refresh = getRefreshToken();
           if (access && refresh) saveSession(access, refresh, updated);
@@ -170,9 +170,10 @@ export default function CollegeDetailPage() {
   const myReviewPending = myReview?.status === "pending";
   const myReviewRejected = myReview?.status === "rejected";
 
-  // User can review only if this college is their UG or PG college
+  // User can review only if this college is their UG or PG college (or, for
+  // faculty, their workplace). The review form itself then checks status.
   const canReview = user && !superAdmin && (
-    user.ug_college === id || user.pg_college === id
+    user.ug_college === id || user.pg_college === id || user.work_college === id
   );
 
   async function handleLogout() {
@@ -467,7 +468,7 @@ export default function CollegeDetailPage() {
                 )}
                 {user && !canReview && (
                   <p style={{ fontSize: "0.8125rem", color: "var(--dd-text3)", lineHeight: 1.5 }}>
-                    Only students affiliated with this college (via your profile) can write a review.
+                    Only people who are studying, have studied, or (faculty) work at this college, as set on your profile, can write a review.
                   </p>
                 )}
               </div>
@@ -534,7 +535,7 @@ export default function CollegeDetailPage() {
                   )}
                   {user && !canReview && (
                     <span style={{ fontSize: "0.8125rem", color: "var(--dd-text3)" }}>
-                      Only students of this college can review it
+                      Only current and former students, and faculty, of this college can review it
                     </span>
                   )}
                   {!user && (

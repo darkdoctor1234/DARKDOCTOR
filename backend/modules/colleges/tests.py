@@ -39,13 +39,13 @@ class ReviewCreationPermissionTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_user_can_review_their_affiliated_college(self):
-        UserProfile.objects.create(user=self.user, ug_college=self.college)
+        UserProfile.objects.create(user=self.user, current_status="ug_student", ug_college=self.college)
         response = self.client.post(f"/api/v1/colleges/{self.college.id}/reviews/", REVIEW_PAYLOAD, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Review.objects.get().status, Review.Status.PENDING)
 
     def test_user_cannot_review_an_unaffiliated_college(self):
-        UserProfile.objects.create(user=self.user, ug_college=self.college)
+        UserProfile.objects.create(user=self.user, current_status="ug_student", ug_college=self.college)
         response = self.client.post(f"/api/v1/colleges/{self.unaffiliated_college.id}/reviews/", REVIEW_PAYLOAD, format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(Review.objects.count(), 0)
@@ -56,23 +56,116 @@ class ReviewCreationPermissionTests(TestCase):
         self.assertIn(response.status_code, (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN))
 
     def test_second_review_for_same_college_is_rejected(self):
-        UserProfile.objects.create(user=self.user, ug_college=self.college)
+        UserProfile.objects.create(user=self.user, current_status="ug_student", ug_college=self.college)
         self.client.post(f"/api/v1/colleges/{self.college.id}/reviews/", REVIEW_PAYLOAD, format="json")
         response = self.client.post(f"/api/v1/colleges/{self.college.id}/reviews/", REVIEW_PAYLOAD, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(Review.objects.count(), 1)
 
     def test_student_role_requires_batch_year(self):
-        UserProfile.objects.create(user=self.user, ug_college=self.college)
+        UserProfile.objects.create(user=self.user, current_status="ug_student", ug_college=self.college)
         payload = {**REVIEW_PAYLOAD, "batch_year": ""}
         response = self.client.post(f"/api/v1/colleges/{self.college.id}/reviews/", payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_rating_out_of_range_is_rejected(self):
-        UserProfile.objects.create(user=self.user, ug_college=self.college)
+        UserProfile.objects.create(user=self.user, current_status="ug_student", ug_college=self.college)
         payload = {**REVIEW_PAYLOAD, "rating_overall": 6}
         response = self.client.post(f"/api/v1/colleges/{self.college.id}/reviews/", payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    # ── Who counts as "studied here": anyone studying or who has studied at
+    # their UG/PG college, whatever their current status — but never an
+    # aspirant's *target* college. ──
+
+    def _post(self, college, role="alumni"):
+        return self.client.post(
+            f"/api/v1/colleges/{college.id}/reviews/", {**REVIEW_PAYLOAD, "role": role}, format="json",
+        )
+
+    def test_ug_aspirant_cannot_review_their_target_college(self):
+        UserProfile.objects.create(user=self.user, current_status="ug_aspirant", ug_college=self.college)
+        self.assertEqual(self._post(self.college).status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_pg_aspirant_can_review_ug_college_but_not_pg_target(self):
+        target = make_college("PG Target College")
+        UserProfile.objects.create(
+            user=self.user, current_status="pg_aspirant", ug_college=self.college, pg_college=target,
+        )
+        self.assertEqual(self._post(self.college).status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self._post(target).status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_pg_student_can_review_both_ug_and_pg_college(self):
+        pg = make_college("PG College")
+        UserProfile.objects.create(
+            user=self.user, current_status="pg_student", ug_college=self.college, pg_college=pg,
+        )
+        self.assertEqual(self._post(self.college).status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self._post(pg, role="student").status_code, status.HTTP_201_CREATED)
+
+    def test_working_professional_can_review_ug_and_pg_college(self):
+        pg = make_college("WP PG College")
+        UserProfile.objects.create(
+            user=self.user, current_status="working_professional", highest_education="pg",
+            ug_college=self.college, pg_college=pg,
+        )
+        self.assertEqual(self._post(self.college).status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self._post(pg).status_code, status.HTTP_201_CREATED)
+
+    def test_faculty_can_review_their_studied_colleges(self):
+        pg = make_college("Faculty PG College")
+        UserProfile.objects.create(
+            user=self.user, current_status="faculty", highest_education="pg",
+            ug_college=self.college, pg_college=pg,
+        )
+        self.assertEqual(self._post(self.college).status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self._post(pg).status_code, status.HTTP_201_CREATED)
+
+    def test_profile_with_no_status_cannot_review(self):
+        UserProfile.objects.create(user=self.user, ug_college=self.college)
+        self.assertEqual(self._post(self.college).status_code, status.HTTP_403_FORBIDDEN)
+
+    # ── Faculty can also review the college they WORK at, as "faculty". ──
+
+    def _faculty_with_workplace(self):
+        work = make_college("Faculty Workplace")
+        UserProfile.objects.create(
+            user=self.user, current_status="faculty", highest_education="ug", batch="2005",
+            ug_college=self.college, work_college=work,
+        )
+        return work
+
+    def test_faculty_can_review_their_workplace_as_faculty_without_a_batch_year(self):
+        work = self._faculty_with_workplace()
+        response = self.client.post(
+            f"/api/v1/colleges/{work.id}/reviews/",
+            {**REVIEW_PAYLOAD, "role": "faculty", "batch_year": ""}, format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Review.objects.get().role, "faculty")
+
+    def test_faculty_still_reviews_their_studied_college_as_alumni(self):
+        self._faculty_with_workplace()
+        self.assertEqual(self._post(self.college, role="alumni").status_code, status.HTTP_201_CREATED)
+
+    def test_role_must_match_the_users_real_role_at_that_college(self):
+        work = self._faculty_with_workplace()
+        # Can't claim "alumni" at the workplace, or "faculty" at a college they only studied at.
+        self.assertEqual(self._post(work, role="alumni").status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self._post(self.college, role="faculty").status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Review.objects.count(), 0)
+
+    def test_non_faculty_cannot_pose_as_faculty(self):
+        UserProfile.objects.create(user=self.user, current_status="alumni", highest_education="ug", batch="2005", ug_college=self.college)
+        self.assertEqual(self._post(self.college, role="faculty").status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_work_college_does_not_count_unless_status_is_faculty(self):
+        work = make_college("Stale Workplace")
+        UserProfile.objects.create(
+            user=self.user, current_status="alumni", highest_education="ug", batch="2005",
+            ug_college=self.college, work_college=work,
+        )
+        self.assertEqual(self._post(work, role="faculty").status_code, status.HTTP_403_FORBIDDEN)
 
 
 class ReviewVisibilityAndModerationTests(TestCase):
@@ -84,7 +177,7 @@ class ReviewVisibilityAndModerationTests(TestCase):
         self.college = make_college()
         self.author = User.objects.create_user(email="author@example.com", password="x", username="author1")
         self.admin = User.objects.create_user(email="reviewadmin@example.com", password="x", username="reviewadmin", role=User.Role.ADMIN)
-        UserProfile.objects.create(user=self.author, ug_college=self.college)
+        UserProfile.objects.create(user=self.author, current_status="ug_student", ug_college=self.college)
 
     def _create_review(self):
         self.client.force_authenticate(user=self.author)

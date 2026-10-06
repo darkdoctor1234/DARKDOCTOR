@@ -38,6 +38,8 @@ class RegisterSerializer(serializers.Serializer):
     )
     ug_college = serializers.IntegerField(required=False, allow_null=True, default=None)
     pg_college = serializers.IntegerField(required=False, allow_null=True, default=None)
+    # Faculty only, and optional — the college they currently work at.
+    work_college = serializers.IntegerField(required=False, allow_null=True, default=None)
     pg_department = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
     batch      = serializers.CharField(max_length=20, required=False, allow_blank=True, default="")
     pg_batch   = serializers.CharField(max_length=20, required=False, allow_blank=True, default="")
@@ -77,6 +79,14 @@ class RegisterSerializer(serializers.Serializer):
         return value
 
     def validate_pg_college(self, value):
+        if value is None:
+            return None
+        from modules.colleges.models import College
+        if not College.objects.filter(pk=value).exists():
+            raise serializers.ValidationError("Invalid college selected.")
+        return value
+
+    def validate_work_college(self, value):
         if value is None:
             return None
         from modules.colleges.models import College
@@ -139,6 +149,9 @@ class RegisterSerializer(serializers.Serializer):
         if show_pg_dept and not pg_department.strip():
             raise serializers.ValidationError({"pg_department": "Please select your PG specialty."})
 
+        if attrs.get("work_college") and status != UserProfile.Status.FACULTY:
+            raise serializers.ValidationError({"work_college": "Only faculty can set a workplace college."})
+
         # `batch` (UG year) / `pg_batch` (PG year) each mean "year joined"
         # while still pursuing that level, or "year completed" once it's
         # finished — see their help_text on the UserProfile model. Kept in
@@ -189,6 +202,7 @@ class RegisterSerializer(serializers.Serializer):
         }
         ug_college_id = validated_data.pop("ug_college", None)
         pg_college_id = validated_data.pop("pg_college", None)
+        work_college_id = validated_data.pop("work_college", None)
 
         with transaction.atomic():
             user = User.objects.create_user(
@@ -223,6 +237,16 @@ class RegisterSerializer(serializers.Serializer):
                     pass
             if ug_college_id or pg_college_id:
                 profile.save(update_fields=["ug_college", "pg_college"])
+
+            # Starts the same 48h self-correction window Settings gives a
+            # newly-set college, so a typo'd workplace can be fixed freely
+            # right after signup instead of needing proof.
+            if work_college_id:
+                from modules.colleges.models import College
+                from django.utils import timezone
+                profile.work_college = College.objects.get(pk=work_college_id)
+                profile.work_college_set_at = timezone.now()
+                profile.save(update_fields=["work_college", "work_college_set_at"])
 
             try:
                 from modules.communities.services import sync_memberships

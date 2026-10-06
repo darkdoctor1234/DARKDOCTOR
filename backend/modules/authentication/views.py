@@ -37,6 +37,7 @@ def build_user_payload(user):
         "highest_education": "",
         "ug_college":        None,
         "pg_college":        None,
+        "work_college":      None,
     }
     try:
         p = user.profile
@@ -45,6 +46,7 @@ def build_user_payload(user):
             "highest_education": p.highest_education or "",
             "ug_college":        p.ug_college_id,   # FK id (None if not set)
             "pg_college":        p.pg_college_id,   # FK id (None if not set)
+            "work_college":      p.work_college_id, # FK id (None if not set; faculty only)
         }
     except Exception:
         pass  # user has no profile yet — defaults above are fine
